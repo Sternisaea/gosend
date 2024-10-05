@@ -11,12 +11,12 @@ import (
 const starttls = "STARTTLS"
 
 type SmtpConnect struct {
-	Hostname   string
-	Port       int
-	User       string
-	Password   string
-	RootCAX509 *x509.CertPool
-	Sender     string
+	hostname   string
+	port       int
+	user       string
+	password   string
+	rootCAX509 *x509.CertPool
+	sender     string
 }
 
 func NewSmtpConnect() *SmtpConnect {
@@ -24,10 +24,10 @@ func NewSmtpConnect() *SmtpConnect {
 }
 
 func (sc *SmtpConnect) SetServer(hostname string, port int, login string, password string) error {
-	(*sc).Hostname = hostname
-	(*sc).Port = port
-	(*sc).User = login
-	(*sc).Password = password
+	(*sc).hostname = hostname
+	(*sc).port = port
+	(*sc).user = login
+	(*sc).password = password
 	return nil
 }
 
@@ -41,39 +41,39 @@ func (sc *SmtpConnect) SetPemCertificate(path string) error {
 	if ok := rootCAs.AppendCertsFromPEM(cert); !ok {
 		return fmt.Errorf("failed to append PEM certificate %s", path)
 	}
-	(*sc).RootCAX509 = rootCAs
+	(*sc).rootCAX509 = rootCAs
 	return nil
 }
 
 func (sc *SmtpConnect) SetSender(sender string) error {
-	(*sc).Sender = sender
+	(*sc).sender = sender
 	return nil
 }
 
 func (sc *SmtpConnect) SendMailTLS(to, cc, bcc string, body string, attachments []string) error {
-	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).Hostname, (*sc).Port))
+	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
 	if ok, _ := c.Extension(starttls); !ok {
-		return fmt.Errorf("server %s does not support %s", (*sc).Hostname, starttls)
+		return fmt.Errorf("server %s does not support %s", (*sc).hostname, starttls)
 	}
 	config := &tls.Config{
-		ServerName: (*sc).Hostname,
-		RootCAs:    (*sc).RootCAX509,
+		ServerName: (*sc).hostname,
+		RootCAs:    (*sc).rootCAX509,
 	}
 	if err = c.StartTLS(config); err != nil {
 		return err
 	}
 
-	auth := smtp.PlainAuth("", (*sc).User, (*sc).Password, (*sc).Hostname)
+	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname)
 	if err := c.Auth(auth); err != nil {
 		return err
 	}
 
-	if err := c.Mail((*sc).Sender); err != nil {
+	if err := c.Mail((*sc).sender); err != nil {
 		return err
 	}
 	if err := c.Rcpt(to); err != nil {
