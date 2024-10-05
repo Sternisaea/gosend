@@ -89,7 +89,6 @@ func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(text) // test
 
 	_, err = wc.Write([]byte(text))
 	if err != nil {
