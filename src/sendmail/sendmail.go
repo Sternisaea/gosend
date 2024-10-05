@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/smtp"
 	"os"
+
+	"github.com/Sternisaea/gosend/src/message"
 )
 
 const starttls = "STARTTLS"
@@ -50,7 +52,7 @@ func (sc *SmtpConnect) SetSender(sender string) error {
 	return nil
 }
 
-func (sc *SmtpConnect) SendMailTLS(to, cc, bcc string, body string, attachments []string) error {
+func (sc *SmtpConnect) SendMailTLS(to, cc, bcc []string, subject string, bodytext, bodyhtml string, attachments []string) error {
 	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 	if err != nil {
 		return err
@@ -76,8 +78,13 @@ func (sc *SmtpConnect) SendMailTLS(to, cc, bcc string, body string, attachments 
 	if err := c.Mail((*sc).sender); err != nil {
 		return err
 	}
-	if err := c.Rcpt(to); err != nil {
-		return err
+
+	rcps := append(to, cc...)
+	rcps = append(rcps, bcc...)
+	for _, e := range rcps {
+		if err := c.Rcpt(e); err != nil {
+			return err
+		}
 	}
 
 	wc, err := c.Data()
@@ -86,7 +93,21 @@ func (sc *SmtpConnect) SendMailTLS(to, cc, bcc string, body string, attachments 
 	}
 	defer wc.Close()
 
-	_, err = wc.Write([]byte(body))
+	msg := message.NewMessage()
+	msg.SetSender((*sc).sender)
+	msg.SetRecipient(to, cc, bcc)
+	msg.SetSubject(subject)
+	msg.SetBodyPlainText(bodytext)
+	msg.SetBodyHtml(bodyhtml)
+	msg.AddAttachment(attachments[0], "image/png") // test
+
+	text, err := msg.GetContentText()
+	if err != nil {
+		return err
+	}
+	fmt.Println(text) // test
+
+	_, err = wc.Write([]byte(text))
 	if err != nil {
 		return err
 	}
