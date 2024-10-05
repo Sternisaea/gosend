@@ -18,7 +18,6 @@ type SmtpConnect struct {
 	user       string
 	password   string
 	rootCAX509 *x509.CertPool
-	sender     string
 }
 
 func NewSmtpConnect() *SmtpConnect {
@@ -47,12 +46,7 @@ func (sc *SmtpConnect) SetPemCertificate(path string) error {
 	return nil
 }
 
-func (sc *SmtpConnect) SetSender(sender string) error {
-	(*sc).sender = sender
-	return nil
-}
-
-func (sc *SmtpConnect) SendMailTLS(to, cc, bcc []string, subject string, bodytext, bodyhtml string, attachments []string) error {
+func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 	if err != nil {
 		return err
@@ -75,13 +69,11 @@ func (sc *SmtpConnect) SendMailTLS(to, cc, bcc []string, subject string, bodytex
 		return err
 	}
 
-	if err := c.Mail((*sc).sender); err != nil {
+	if err := c.Mail(message.GetSender()); err != nil {
 		return err
 	}
 
-	rcps := append(to, cc...)
-	rcps = append(rcps, bcc...)
-	for _, e := range rcps {
+	for _, e := range message.GetRecipients() {
 		if err := c.Rcpt(e); err != nil {
 			return err
 		}
@@ -93,15 +85,7 @@ func (sc *SmtpConnect) SendMailTLS(to, cc, bcc []string, subject string, bodytex
 	}
 	defer wc.Close()
 
-	msg := message.NewMessage()
-	msg.SetSender((*sc).sender)
-	msg.SetRecipient(to, cc, bcc)
-	msg.SetSubject(subject)
-	msg.SetBodyPlainText(bodytext)
-	msg.SetBodyHtml(bodyhtml)
-	msg.AddAttachment(attachments[0], "image/png") // test
-
-	text, err := msg.GetContentText()
+	text, err := message.GetContentText()
 	if err != nil {
 		return err
 	}

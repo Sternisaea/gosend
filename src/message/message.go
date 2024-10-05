@@ -37,10 +37,20 @@ func (msg *Message) SetSender(from string) {
 	(*msg).from = from
 }
 
+func (msg *Message) GetSender() string {
+	return (*msg).from
+}
+
 func (msg *Message) SetRecipient(to, cc, bcc []string) {
 	(*msg).to = to
 	(*msg).cc = cc
 	(*msg).bcc = bcc
+}
+
+func (msg *Message) GetRecipients() []string {
+	rcps := append((*msg).to, (*msg).cc...)
+	rcps = append(rcps, (*msg).bcc...)
+	return rcps
 }
 
 func (msg *Message) SetSubject(subject string) {
