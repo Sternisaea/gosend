@@ -73,7 +73,7 @@ func (msg *Message) GetContentText() (string, error) {
 		}
 		result += fmt.Sprintf("Subject: %s\r\n", (*msg).subject)
 		result += "MIME-Version: 1.0\r\n"
-		result += cnt.getContentString("")
+		result += cnt.getContentPart("")
 	}
 	return result, nil
 }
@@ -96,7 +96,7 @@ func (msg *Message) getContentTree() (*content, error) {
 		bound := getRandomString(20)
 		return &content{
 			boundary: bound,
-			headers:  []string{fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"boundaryXXX\"", bound)},
+			headers:  []string{fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"", bound)},
 			text:     "",
 			parts:    &prts,
 		}, nil
@@ -185,13 +185,13 @@ func getRandomString(length int) string {
 	return string(b)
 }
 
-func (cnt *content) getContentString(bound string) string {
+func (cnt *content) getContentPart(bound string) string {
 	if cnt == nil {
 		return ""
 	}
 	result := ""
 	if bound != "" {
-		result += fmt.Sprintf("--%s\r\n", (*cnt).boundary)
+		result += fmt.Sprintf("--%s\r\n", bound)
 	}
 	for _, h := range (*cnt).headers {
 		result += fmt.Sprintf("%s\r\n", h)
@@ -199,11 +199,11 @@ func (cnt *content) getContentString(bound string) string {
 	result += "\r\n"
 	if (*cnt).text != "" {
 		result += (*cnt).text
-		result += "\r\n"
+		result += "\r\n\r\n"
 	}
 	if (*cnt).parts != nil {
 		for _, p := range *(*cnt).parts {
-			result += (&p).getContentString((*cnt).boundary)
+			result += (&p).getContentPart((*cnt).boundary)
 		}
 	}
 	if (*cnt).boundary != "" {
