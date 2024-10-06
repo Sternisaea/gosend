@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/smtp"
 	"os"
+	"strings"
 
 	"github.com/Sternisaea/gosend/src/message"
 )
@@ -47,6 +48,17 @@ func (sc *SmtpConnect) SetPemCertificate(path string) error {
 }
 
 func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
+	var errMsgs []string
+	if errMsg := (*sc).CheckServer(); errMsg != "" {
+		errMsgs = append(errMsgs, errMsg)
+	}
+	if errMsg := (*message).CheckMessage(); errMsg != "" {
+		errMsgs = append(errMsgs, errMsg)
+	}
+	if len(errMsgs) != 0 {
+		return fmt.Errorf("checking errors: [%s]", strings.Join(errMsgs, "], ["))
+	}
+
 	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 	if err != nil {
 		return err
@@ -95,4 +107,24 @@ func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 		return err
 	}
 	return nil
+}
+
+func (sc *SmtpConnect) CheckServer() string {
+	var errMsgs []string
+	if (*sc).hostname == "" {
+		errMsgs = append(errMsgs, "No hostname provided")
+	}
+	if (*sc).port == 0 {
+		errMsgs = append(errMsgs, "No port provided")
+	}
+	if (*sc).user == "" {
+		errMsgs = append(errMsgs, "No login user provided")
+	}
+	if (*sc).password == "" {
+		errMsgs = append(errMsgs, "No password provided")
+	}
+	if len(errMsgs) > 0 {
+		return fmt.Sprintf("Server: %s", strings.Join(errMsgs, ", "))
+	}
+	return ""
 }

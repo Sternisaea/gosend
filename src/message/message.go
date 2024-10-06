@@ -68,6 +68,23 @@ func (msg *Message) AddAttachment(filePath string, contentType string) string {
 	return id
 }
 
+func (msg *Message) CheckMessage() string {
+	var errMsgs []string
+	if (*msg).from == "" {
+		errMsgs = append(errMsgs, "No sender provided")
+	}
+	if len((*msg).to) == 0 {
+		errMsgs = append(errMsgs, "No recipients provided")
+	}
+	if (*msg).subject == "" {
+		errMsgs = append(errMsgs, "No subject provided")
+	}
+	if len(errMsgs) > 0 {
+		return fmt.Sprintf("Message: %s", strings.Join(errMsgs, ", "))
+	}
+	return ""
+}
+
 func (msg *Message) GetContentText() (string, error) {
 	cnt, err := (*msg).getContentTree()
 	if err != nil {
