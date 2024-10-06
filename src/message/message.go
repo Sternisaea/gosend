@@ -134,7 +134,7 @@ func (msg *Message) getBodyContent() *content {
 		bound := getRandomString(20)
 		return &content{
 			boundary: bound,
-			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"boundary%s\"", bound)},
+			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", bound)},
 			text:     "",
 			parts:    &[]content{pl, ht},
 		}
