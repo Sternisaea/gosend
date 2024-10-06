@@ -123,10 +123,16 @@ func (msg *Message) getBodyContent() *content {
 		}
 	}
 	if (*msg).htmltext != "" {
+		htmltxt := (*msg).htmltext
+		for _, a := range (*msg).attachments {
+			if a.contentID != "" {
+				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.fileName), fmt.Sprintf("\"cid:%s\"", a.contentID))
+			}
+		}
 		ht = content{
 			boundary: "",
 			headers:  []string{"Content-Type: text/html; charset=\"UTF-8\"", "Content-Transfer-Encoding: 7bit"},
-			text:     (*msg).htmltext,
+			text:     htmltxt,
 			parts:    nil,
 		}
 	}
