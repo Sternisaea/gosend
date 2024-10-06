@@ -17,13 +17,6 @@ type Message struct {
 	attachments []attachment
 }
 
-type content struct {
-	boundary string
-	headers  []string
-	text     string
-	parts    *[]content
-}
-
 type attachment struct {
 	filePath    string
 	contentType string
@@ -141,7 +134,7 @@ func (msg *Message) getBodyContent() *content {
 		bound := getRandomString(20)
 		return &content{
 			boundary: bound,
-			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"boundaryXXX\"", bound)},
+			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"boundary%s\"", bound)},
 			text:     "",
 			parts:    &[]content{pl, ht},
 		}
@@ -193,31 +186,4 @@ func getRandomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
-}
-
-func (cnt *content) getContentPart(bound string) string {
-	if cnt == nil {
-		return ""
-	}
-	result := ""
-	if bound != "" {
-		result += fmt.Sprintf("--%s\r\n", bound)
-	}
-	for _, h := range (*cnt).headers {
-		result += fmt.Sprintf("%s\r\n", h)
-	}
-	result += "\r\n"
-	if (*cnt).text != "" {
-		result += (*cnt).text
-		result += "\r\n\r\n"
-	}
-	if (*cnt).parts != nil {
-		for _, p := range *(*cnt).parts {
-			result += (&p).getContentPart((*cnt).boundary)
-		}
-	}
-	if (*cnt).boundary != "" {
-		result += fmt.Sprintf("--%s--\r\n", (*cnt).boundary)
-	}
-	return result
 }
