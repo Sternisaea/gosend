@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,7 +20,9 @@ type Message struct {
 
 type attachment struct {
 	filePath    string
+	fileName    string
 	contentType string
+	contentID   string
 }
 
 func NewMessage() *Message {
@@ -58,8 +61,11 @@ func (msg *Message) SetBodyHtml(htmltext string) {
 	(*msg).htmltext = htmltext
 }
 
-func (msg *Message) AddAttachment(filePath string, contentType string) {
-	(*msg).attachments = append((*msg).attachments, attachment{filePath: filePath, contentType: contentType})
+func (msg *Message) AddAttachment(filePath string, contentType string) string {
+	fileName := filepath.Base(filePath)
+	id := getRandomString(52)
+	(*msg).attachments = append((*msg).attachments, attachment{filePath: filePath, fileName: fileName, contentType: contentType, contentID: id})
+	return id
 }
 
 func (msg *Message) GetContentText() (string, error) {
@@ -163,17 +169,20 @@ func (msg *Message) getAttachmentContent() ([]content, error) {
 		}
 
 		encoded := base64.StdEncoding.EncodeToString(buffer)
-		filename := fileInfo.Name()
+
+		headers := make([]string, 0, 4)
+		headers = append(headers, fmt.Sprintf("Content-Type: %s; name=\"%s\"", a.contentType, a.fileName))
+		headers = append(headers, "Content-Transfer-Encoding: base64")
+		headers = append(headers, fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"", a.fileName))
+		if a.contentID != "" {
+			headers = append(headers, fmt.Sprintf("Content-ID: %s", a.contentID))
+		}
 
 		cnts = append(cnts, content{
 			boundary: "",
-			headers: []string{
-				fmt.Sprintf("Content-Type: %s; name=\"%s\"", a.contentType, filename),
-				"Content-Transfer-Encoding: base64",
-				fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"", filename),
-			},
-			text:  encoded,
-			parts: nil,
+			headers:  headers,
+			text:     encoded,
+			parts:    nil,
 		})
 	}
 	return cnts, nil
