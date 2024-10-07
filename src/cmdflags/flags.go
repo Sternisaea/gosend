@@ -1,49 +1,137 @@
 package cmdflags
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
-func GetCmdFlags() {
-	var co cmdOptions
-	flag.StringVar(&co.serverSettingsFile, "server-settings-file", "", "Path to settings file")
-	flag.StringVar(&co.smtpHost, "smtp-host", "", "Hostname of SMTP server")
-	flag.IntVar(&co.smtpPort, "smtp-port", 0, "TCP port of SMTP server")
+const (
+	flagServerSettingsFile = "server-settings-file"
+	flagSmtpHost           = "smtp-host"
+	flagSmtpPort           = "smtp-port"
+	flagAuthFile           = "auth-file"
+	flagAuthMethod         = "auth-method"
+	flagLogin              = "login"
+	flagPassword           = "password"
+	flagSender             = "sender"
+	flagTo                 = "to"
+	flagCc                 = "cc"
+	flagBcc                = "bcc"
+	flagSubject            = "subject"
+	flagAttachments        = "attachments"
+)
 
-	flag.StringVar(&co.authFile, "auth-file", "", "Path to authentication file")
-	flag.StringVar(&co.authMethod, "auth-method", "", "Authentication method")
-	flag.StringVar(&co.login, "login", "", "Login username")
-	flag.StringVar(&co.password, "password", "", "Login password")
+type Settings struct {
+	smtpHost   types.DomainName
+	smtpPort   types.TCPPort
+	authMethod types.AuthMethod
+	login      string
+	password   string
+	sender     types.Email
 
-	flag.StringVar(&co.sender, "sender", "", "Email sender address")
-	flag.StringVar(&co.subject, "subject", "", "Email subject")
+	recipientsTo  types.EmailAddresses
+	recipientsCC  types.EmailAddresses
+	recipientsBCC types.EmailAddresses
+	subject       string
 
-	var RecipientsTo, RecipientsCC, RecipientsBCC stringSlice
-	flag.Var(&RecipientsTo, "to", "Recipient TO address")
-	flag.Var(&RecipientsCC, "cc", "Recipient CC address")
-	flag.Var(&RecipientsBCC, "bcc", "Recipient BCC address")
+	// attachments []types.FilePath
+}
+
+func GetSettings() (*Settings, error) {
+	fs, serverFilePath, authFilePath := getFlagsettings()
+
+	opts := make(map[string]string)
+	opts, err := appendOptionsOfFile(opts, serverFilePath)
+	if err != nil {
+		return nil, err
+	}
+	opts, err = appendOptionsOfFile(opts, authFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if fs.smtpHost == "" {
+		if err := fs.smtpHost.Set(opts[flagSmtpHost]); err != nil {
+			return nil, err
+		}
+	}
+	if fs.smtpPort == 0 {
+		if err := fs.smtpPort.Set(opts[flagSmtpPort]); err != nil {
+			return nil, err
+		}
+	}
+	if fs.authMethod == "" {
+		if err := fs.authMethod.Set(opts[flagAuthMethod]); err != nil {
+			return nil, err
+		}
+	}
+	if fs.login == "" {
+		fs.login = opts[flagLogin]
+	}
+	if fs.password == "" {
+		fs.password = opts[flagPassword]
+	}
+	if fs.sender == "" {
+		if err := fs.sender.Set(opts[flagSender]); err != nil {
+			return nil, err
+		}
+	}
+	return &fs, nil
+}
+
+func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
+	var serverFilePath, authFilePath types.FilePath
+	var fs Settings
+	flag.Var(&serverFilePath, flagServerSettingsFile, "Path to settings file")
+	flag.Var(&fs.smtpHost, flagSmtpHost, "Hostname of SMTP server")
+	flag.Var(&fs.smtpPort, flagSmtpPort, "TCP port of SMTP server")
+
+	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file")
+	flag.Var(&fs.authMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s)", types.STARTTLS, types.SSLTLS))
+	flag.StringVar(&fs.login, flagLogin, "", "Login username")
+	flag.StringVar(&fs.password, flagPassword, "", "Login password")
+	flag.Var(&fs.sender, flagSender, "Email address of sender")
+
+	flag.Var(&fs.recipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
+	flag.Var(&fs.recipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
+	flag.Var(&fs.recipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
+	flag.StringVar(&fs.subject, flagSubject, "", "Email subject")
 
 	// flag.StringVar(&co.attachments, "attachments", "", "Comma-separated list of file paths to attach")
 	flag.Parse()
-
-	co.recipientsTo = extractEmailAddresses(RecipientsTo)
-	co.recipientsCC = extractEmailAddresses(RecipientsCC)
-	co.recipientsBCC = extractEmailAddresses(RecipientsBCC)
-
-	fmt.Printf("%#v\n", co)
+	return fs, serverFilePath, authFilePath
 }
 
-func extractEmailAddresses(addresses []string) []string {
-	var addrs []string
-	for _, addr := range addresses {
-		for _, a := range strings.Split(addr, ",") {
-			ea := strings.Trim(a, " ")
-			if ea != "" {
-				addrs = append(addrs, ea)
-			}
-		}
+func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[string]string, error) {
+	if filePath == "" {
+		return opts, nil
 	}
-	return addrs
+	file, err := os.Open(filePath.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %s", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		equalIndex := strings.Index(line, "=")
+		if equalIndex == -1 {
+			continue
+		}
+		key := strings.TrimSpace(line[:equalIndex])
+		value := strings.TrimSpace(line[equalIndex+1:])
+		opts[key] = value
+
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %s", err)
+	}
+	return opts, nil
 }
