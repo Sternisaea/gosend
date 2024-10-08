@@ -24,6 +24,7 @@ const (
 	flagBcc                = "bcc"
 	flagSubject            = "subject"
 	flagAttachment         = "attachment"
+	flagHelp               = "help"
 )
 
 type Settings struct {
@@ -40,10 +41,17 @@ type Settings struct {
 	subject       string
 
 	attachments types.Attachments
+
+	help bool
 }
 
 func GetSettings() (*Settings, error) {
 	fs, serverFilePath, authFilePath := getFlagsettings()
+
+	if fs.help {
+		flag.Usage()
+		return nil, nil
+	}
 
 	opts := make(map[string]string)
 	opts, err := appendOptionsOfFile(opts, serverFilePath)
@@ -103,6 +111,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.StringVar(&fs.subject, flagSubject, "", "Email subject")
 
 	flag.Var(&fs.attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
+	flag.BoolVar(&fs.help, flagHelp, false, "Show flag options")
 	flag.Parse()
 	return fs, serverFilePath, authFilePath
 }

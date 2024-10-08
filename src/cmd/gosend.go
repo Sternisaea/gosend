@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/Sternisaea/gosend/src/cmdflags"
 	"github.com/Sternisaea/gosend/src/message"
 	"github.com/Sternisaea/gosend/src/sendmail"
 )
@@ -11,8 +12,13 @@ import (
 func main() {
 	fmt.Println("gosend")
 
-	exampleSend()
-
+	s, err := cmdflags.GetSettings()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if s != nil {
+		fmt.Printf("%#v\n", *s)
+	}
 }
 
 func exampleSend() {
