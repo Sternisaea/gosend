@@ -23,6 +23,8 @@ const (
 	flagCc                 = "cc"
 	flagBcc                = "bcc"
 	flagSubject            = "subject"
+	flagBodyText           = "body-text"
+	flagBodyHtml           = "body-html"
 	flagAttachment         = "attachment"
 	flagHelp               = "help"
 )
@@ -40,6 +42,8 @@ type Settings struct {
 	recipientsBCC types.EmailAddresses
 	subject       string
 
+	bodyText    string
+	bodyHtml    string
 	attachments types.Attachments
 
 	help bool
@@ -95,23 +99,25 @@ func GetSettings() (*Settings, error) {
 func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	var serverFilePath, authFilePath types.FilePath
 	var fs Settings
-	flag.Var(&serverFilePath, flagServerSettingsFile, "Path to settings file")
-	flag.Var(&fs.smtpHost, flagSmtpHost, "Hostname of SMTP server")
-	flag.Var(&fs.smtpPort, flagSmtpPort, "TCP port of SMTP server")
+	flag.Var(&serverFilePath, flagServerSettingsFile, "Path to settings file.")
+	flag.Var(&fs.smtpHost, flagSmtpHost, "Hostname of SMTP server.")
+	flag.Var(&fs.smtpPort, flagSmtpPort, "TCP port of SMTP server.")
 
-	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file")
-	flag.Var(&fs.authMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s)", types.STARTTLS, types.SSLTLS))
+	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
+	flag.Var(&fs.authMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s).", types.STARTTLS, types.SSLTLS))
 	flag.StringVar(&fs.login, flagLogin, "", "Login username")
-	flag.StringVar(&fs.password, flagPassword, "", "Login password")
-	flag.Var(&fs.sender, flagSender, "Email address of sender")
+	flag.StringVar(&fs.password, flagPassword, "", "Login password.")
+	flag.Var(&fs.sender, flagSender, "Email address of sender.")
 
 	flag.Var(&fs.recipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
 	flag.Var(&fs.recipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
 	flag.Var(&fs.recipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
 	flag.StringVar(&fs.subject, flagSubject, "", "Email subject")
 
+	flag.StringVar(&fs.bodyText, flagBodyText, "", "Body content in plain text.")
+	flag.StringVar(&fs.bodyHtml, flagBodyHtml, "", "Body content in HTML.")
 	flag.Var(&fs.attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
-	flag.BoolVar(&fs.help, flagHelp, false, "Show flag options")
+	flag.BoolVar(&fs.help, flagHelp, false, "Show flag options.")
 	flag.Parse()
 	return fs, serverFilePath, authFilePath
 }
