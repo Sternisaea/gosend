@@ -9,13 +9,15 @@ import (
 	"strings"
 
 	"github.com/Sternisaea/gosend/src/message"
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 const starttls = "STARTTLS"
 
 type SmtpConnect struct {
-	hostname   string
-	port       int
+	hostname   types.DomainName
+	port       types.TCPPort
+	auth       types.AuthMethod
 	user       string
 	password   string
 	rootCAX509 *x509.CertPool
@@ -25,9 +27,10 @@ func NewSmtpConnect() *SmtpConnect {
 	return &SmtpConnect{}
 }
 
-func (sc *SmtpConnect) SetServer(hostname string, port int, login string, password string) error {
+func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, auth types.AuthMethod, login string, password string) error {
 	(*sc).hostname = hostname
 	(*sc).port = port
+	(*sc).auth = auth
 	(*sc).user = login
 	(*sc).password = password
 	return nil
@@ -69,14 +72,14 @@ func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 		return fmt.Errorf("server %s does not support %s", (*sc).hostname, starttls)
 	}
 	config := &tls.Config{
-		ServerName: (*sc).hostname,
+		ServerName: (*sc).hostname.String(),
 		RootCAs:    (*sc).rootCAX509,
 	}
 	if err = c.StartTLS(config); err != nil {
 		return err
 	}
 
-	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname)
+	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname.String())
 	if err := c.Auth(auth); err != nil {
 		return err
 	}
@@ -116,6 +119,9 @@ func (sc *SmtpConnect) CheckServer() string {
 	}
 	if (*sc).port == 0 {
 		errMsgs = append(errMsgs, "No port provided")
+	}
+	if (*sc).auth == "" {
+		errMsgs = append(errMsgs, "No authentication method provided")
 	}
 	if (*sc).user == "" {
 		errMsgs = append(errMsgs, "No login user provided")
