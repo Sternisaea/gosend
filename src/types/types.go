@@ -118,3 +118,27 @@ func (eas *EmailAddresses) Set(emailsText string) error {
 func (eas EmailAddresses) String() string {
 	return strings.Join(eas, ",")
 }
+
+type Attachments []FilePath
+
+func (at *Attachments) Set(attachments string) error {
+	for _, a := range strings.Split(attachments, ",") {
+		attach := strings.TrimSpace(a)
+		if attach != "" {
+			var fp FilePath
+			if err := fp.Set(attach); err != nil {
+				return fmt.Errorf("invalid attachment: %s (%s)", attach, err)
+			}
+			*at = append(*at, fp)
+		}
+	}
+	return nil
+}
+
+func (at Attachments) String() string {
+	attchs := make([]string, 0, len(at))
+	for _, fp := range at {
+		attchs = append(attchs, fp.String())
+	}
+	return strings.Join(attchs, ", ")
+}

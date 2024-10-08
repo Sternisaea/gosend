@@ -23,7 +23,7 @@ const (
 	flagCc                 = "cc"
 	flagBcc                = "bcc"
 	flagSubject            = "subject"
-	flagAttachments        = "attachments"
+	flagAttachment         = "attachment"
 )
 
 type Settings struct {
@@ -39,7 +39,7 @@ type Settings struct {
 	recipientsBCC types.EmailAddresses
 	subject       string
 
-	// attachments []types.FilePath
+	attachments types.Attachments
 }
 
 func GetSettings() (*Settings, error) {
@@ -102,7 +102,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.recipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
 	flag.StringVar(&fs.subject, flagSubject, "", "Email subject")
 
-	// flag.StringVar(&co.attachments, "attachments", "", "Comma-separated list of file paths to attach")
+	flag.Var(&fs.attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
 	flag.Parse()
 	return fs, serverFilePath, authFilePath
 }
