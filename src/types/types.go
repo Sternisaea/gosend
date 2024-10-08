@@ -100,23 +100,29 @@ func (e Email) String() string {
 	return string(e)
 }
 
-type EmailAddresses []string
+type EmailAddresses []Email
 
-func (eas *EmailAddresses) Set(emailsText string) error {
-	for _, a := range strings.Split(emailsText, ",") {
-		ea := strings.Trim(a, " ")
-		if ea != "" {
-			if _, err := mail.ParseAddress(ea); err != nil {
-				return fmt.Errorf("invalid email address: %s (%s)", ea, err)
+func (eas *EmailAddresses) Set(emails string) error {
+	for _, e := range strings.Split(emails, ",") {
+		em := strings.TrimSpace(e)
+		if em != "" {
+			var email Email
+			if err := email.Set(em); err != nil {
+				return err
+
 			}
-			*eas = append(*eas, ea)
+			*eas = append(*eas, email)
 		}
 	}
 	return nil
 }
 
 func (eas EmailAddresses) String() string {
-	return strings.Join(eas, ",")
+	emails := make([]string, 0, len(eas))
+	for _, e := range eas {
+		emails = append(emails, e.String())
+	}
+	return strings.Join(emails, ", ")
 }
 
 type Attachments []FilePath
