@@ -118,11 +118,15 @@ func (eas *EmailAddresses) Set(emails string) error {
 }
 
 func (eas EmailAddresses) String() string {
+	return strings.Join(eas.StringSlice(), ", ")
+}
+
+func (eas EmailAddresses) StringSlice() []string {
 	emails := make([]string, 0, len(eas))
 	for _, e := range eas {
 		emails = append(emails, e.String())
 	}
-	return strings.Join(emails, ", ")
+	return emails
 }
 
 type Attachments []FilePath
