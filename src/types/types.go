@@ -72,7 +72,7 @@ const (
 )
 
 func (a *AuthMethod) Set(auth string) error {
-	switch auth {
+	switch strings.ToUpper(auth) {
 	case "", STARTTLS.String(), SSLTLS.String():
 		*a = AuthMethod(auth)
 		return nil
