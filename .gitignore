@@ -25,5 +25,6 @@ go.work.sum
 .env
 
 # Exclude directories
+/.vscode/
 /certificates/
 /example/
