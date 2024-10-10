@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,7 +62,11 @@ func (msg *Message) SetBodyHtml(htmltext string) {
 	(*msg).htmltext = htmltext
 }
 
-func (msg *Message) AddAttachment(filePath string, contentType string) string {
+func (msg *Message) AddAttachment(filePath string) string {
+	return msg.AddAttachmentWithContentType(filePath, "")
+}
+
+func (msg *Message) AddAttachmentWithContentType(filePath string, contentType string) string {
 	fileName := filepath.Base(filePath)
 	id := getRandomString(52)
 	(*msg).attachments = append((*msg).attachments, attachment{filePath: filePath, fileName: fileName, contentType: contentType, contentID: id})
@@ -81,6 +86,11 @@ func (msg *Message) CheckMessage() string {
 	}
 	if len(errMsgs) > 0 {
 		return fmt.Sprintf("Message: %s", strings.Join(errMsgs, ", "))
+	}
+	for _, a := range (*msg).attachments {
+		if _, err := os.Stat(a.filePath); os.IsNotExist(err) {
+			errMsgs = append(errMsgs, fmt.Sprintf("Attachment file %s does not exist", a.filePath))
+		}
 	}
 	return ""
 }
@@ -173,7 +183,7 @@ func (msg *Message) getBodyContent() *content {
 
 func (msg *Message) getAttachmentContent() ([]content, error) {
 	var cnts []content
-	for _, a := range (*msg).attachments {
+	for i, a := range (*msg).attachments {
 		file, err := os.Open(a.filePath)
 		if err != nil {
 			return nil, err
@@ -189,6 +199,12 @@ func (msg *Message) getAttachmentContent() ([]content, error) {
 		_, err = file.Read(buffer)
 		if err != nil {
 			return nil, err
+		}
+
+		if a.contentType == "" {
+			contentType := http.DetectContentType(buffer[:512])
+			(*msg).attachments[i].contentType = contentType
+			a.contentType = contentType
 		}
 
 		encoded := base64.StdEncoding.EncodeToString(buffer)
