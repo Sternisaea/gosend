@@ -18,7 +18,7 @@ func (cnt *content) getContentPart(bound string) string {
 		result += fmt.Sprintf("--%s\r\n", bound)
 	}
 	for _, h := range (*cnt).headers {
-		result += fmt.Sprintf("%s\r\n", h)
+		result += h + "\r\n"
 	}
 	result += "\r\n"
 	if (*cnt).text != "" {
