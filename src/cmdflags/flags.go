@@ -79,6 +79,11 @@ func GetSettings() (*Settings, error) {
 			return nil, err
 		}
 	}
+	if fs.RootCA == "" {
+		if err := fs.RootCA.Set(opts[flagRootCA]); err != nil {
+			return nil, err
+		}
+	}
 	if fs.AuthMethod == "" {
 		if err := fs.AuthMethod.Set(opts[flagAuthMethod]); err != nil {
 			return nil, err
