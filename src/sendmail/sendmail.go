@@ -37,8 +37,8 @@ func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, 
 }
 
 // Note: The certificate must support SAN (Subject Alternative Name)
-func (sc *SmtpConnect) SetPemCertificate(path string) error {
-	cert, err := os.ReadFile(path)
+func (sc *SmtpConnect) SetPemCertificate(path types.FilePath) error {
+	cert, err := os.ReadFile(path.String())
 	if err != nil {
 		return err
 	}
@@ -50,12 +50,22 @@ func (sc *SmtpConnect) SetPemCertificate(path string) error {
 	return nil
 }
 
-func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
+func (sc *SmtpConnect) SendMailTLS(sender types.Email, to types.EmailAddresses, cc types.EmailAddresses, bcc types.EmailAddresses, subject string, bodyText string, bodyHtml string, attachments []types.FilePath) error {
+	msg := message.NewMessage()
+	msg.SetSender(sender.String())
+	msg.SetRecipient(to.StringSlice(), cc.StringSlice(), bcc.StringSlice())
+	msg.SetSubject(subject)
+	msg.SetBodyPlainText(bodyText)
+	msg.SetBodyHtml(bodyHtml)
+	for _, a := range attachments {
+		msg.AddAttachment(a.String())
+	}
+
 	var errMsgs []string
 	if errMsg := (*sc).CheckServer(); errMsg != "" {
 		errMsgs = append(errMsgs, errMsg)
 	}
-	if errMsg := (*message).CheckMessage(); errMsg != "" {
+	if errMsg := msg.CheckMessage(); errMsg != "" {
 		errMsgs = append(errMsgs, errMsg)
 	}
 	if len(errMsgs) != 0 {
@@ -84,11 +94,11 @@ func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 		return err
 	}
 
-	if err := c.Mail(message.GetSender()); err != nil {
+	if err := c.Mail(msg.GetSender()); err != nil {
 		return err
 	}
 
-	for _, e := range message.GetRecipients() {
+	for _, e := range msg.GetRecipients() {
 		if err := c.Rcpt(e); err != nil {
 			return err
 		}
@@ -100,7 +110,7 @@ func (sc *SmtpConnect) SendMailTLS(message *message.Message) error {
 	}
 	defer wc.Close()
 
-	text, err := message.GetContentText()
+	text, err := msg.GetContentText()
 	if err != nil {
 		return err
 	}
