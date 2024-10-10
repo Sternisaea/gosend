@@ -142,10 +142,12 @@ func (msg *Message) getContentTree() (*content, error) {
 func (msg *Message) getBodyContent() *content {
 	var pl, ht content
 	if (*msg).plaintext != "" {
+		plaintext := strings.ReplaceAll((*msg).plaintext, "\r\n", "\n")
+		plaintext = strings.ReplaceAll(plaintext, "\n", "\r\n")
 		pl = content{
 			boundary: "",
 			headers:  []string{"contentType: Content-Type: text/plain; charset=\"UTF-8\"", "Content-Transfer-Encoding: 7bit"},
-			text:     (*msg).plaintext,
+			text:     plaintext,
 			parts:    nil,
 		}
 	}
