@@ -153,6 +153,7 @@ func (msg *Message) getBodyContent() *content {
 		htmltxt := (*msg).htmltext
 		for _, a := range (*msg).attachments {
 			if a.contentID != "" {
+				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.filePath), fmt.Sprintf("\"cid:%s\"", a.contentID))
 				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.fileName), fmt.Sprintf("\"cid:%s\"", a.contentID))
 			}
 		}
