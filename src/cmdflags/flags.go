@@ -109,7 +109,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&serverFilePath, flagServerSettingsFile, "Path to settings file.")
 	flag.Var(&fs.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
 	flag.Var(&fs.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
-	flag.Var(&fs.RootCA, flagRootCA, "X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
+	flag.Var(&fs.RootCA, flagRootCA, "File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
 
 	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
 	flag.Var(&fs.AuthMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s).", types.STARTTLS, types.SSLTLS))
