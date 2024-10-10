@@ -148,7 +148,7 @@ func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[s
 		if equalIndex == -1 {
 			continue
 		}
-		key := strings.TrimSpace(line[:equalIndex])
+		key := strings.ToLower(strings.TrimSpace(line[:equalIndex]))
 		value := strings.TrimSpace(line[equalIndex+1:])
 		opts[key] = value
 
