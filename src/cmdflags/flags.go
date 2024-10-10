@@ -11,23 +11,23 @@ import (
 )
 
 const (
-	flagServerSettingsFile = "server-settings-file"
-	flagSmtpHost           = "smtp-host"
-	flagSmtpPort           = "smtp-port"
-	flagRootCA             = "rootca"
-	flagAuthFile           = "auth-file"
-	flagAuthMethod         = "auth-method"
-	flagLogin              = "login"
-	flagPassword           = "password"
-	flagSender             = "sender"
-	flagTo                 = "to"
-	flagCc                 = "cc"
-	flagBcc                = "bcc"
-	flagSubject            = "subject"
-	flagBodyText           = "body-text"
-	flagBodyHtml           = "body-html"
-	flagAttachment         = "attachment"
-	flagHelp               = "help"
+	flagServerFile = "server-file"
+	flagSmtpHost   = "smtp-host"
+	flagSmtpPort   = "smtp-port"
+	flagRootCA     = "rootca"
+	flagAuthFile   = "auth-file"
+	flagAuthMethod = "auth-method"
+	flagLogin      = "login"
+	flagPassword   = "password"
+	flagSender     = "sender"
+	flagTo         = "to"
+	flagCc         = "cc"
+	flagBcc        = "bcc"
+	flagSubject    = "subject"
+	flagBodyText   = "body-text"
+	flagBodyHtml   = "body-html"
+	flagAttachment = "attachment"
+	flagHelp       = "help"
 )
 
 type Settings struct {
@@ -106,7 +106,7 @@ func GetSettings() (*Settings, error) {
 func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	var serverFilePath, authFilePath types.FilePath
 	var fs Settings
-	flag.Var(&serverFilePath, flagServerSettingsFile, "Path to settings file.")
+	flag.Var(&serverFilePath, flagServerFile, "Path to settings file.")
 	flag.Var(&fs.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
 	flag.Var(&fs.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
 	flag.Var(&fs.RootCA, flagRootCA, "File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
