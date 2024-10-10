@@ -12,8 +12,6 @@ import (
 	"github.com/Sternisaea/gosend/src/types"
 )
 
-const starttls = "STARTTLS"
-
 type SmtpConnect struct {
 	hostname   types.DomainName
 	port       types.TCPPort
@@ -72,39 +70,57 @@ func (sc *SmtpConnect) SendMailTLS(sender types.Email, to types.EmailAddresses, 
 		return fmt.Errorf("checking errors: [%s]", strings.Join(errMsgs, "], ["))
 	}
 
-	c, err := smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	if ok, _ := c.Extension(starttls); !ok {
-		return fmt.Errorf("server %s does not support %s", (*sc).hostname, starttls)
-	}
+	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname.String())
 	config := &tls.Config{
 		ServerName: (*sc).hostname.String(),
 		RootCAs:    (*sc).rootCAX509,
 	}
-	if err = c.StartTLS(config); err != nil {
+
+	var cl *smtp.Client
+	var err error
+	switch sc.auth {
+	case types.STARTTLS:
+		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
+		if err != nil {
+			return err
+		}
+		defer cl.Close()
+
+		if ok, _ := cl.Extension(types.STARTTLS.String()); !ok {
+			return fmt.Errorf("server %s does not support %s", (*sc).hostname, types.STARTTLS)
+		}
+		if err = cl.StartTLS(config); err != nil {
+			return err
+		}
+	case types.SSLTLS:
+		conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port), config)
+		if err != nil {
+			return fmt.Errorf("server %s does not support SSL/TLS: %s", (*sc).hostname, err)
+		}
+		defer conn.Close()
+
+		cl, err = smtp.NewClient(conn, (*sc).hostname.String())
+		if err != nil {
+			return err
+		}
+		defer cl.Close()
+	}
+
+	if err = cl.Auth(auth); err != nil {
 		return err
 	}
 
-	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname.String())
-	if err := c.Auth(auth); err != nil {
-		return err
-	}
-
-	if err := c.Mail(msg.GetSender()); err != nil {
+	if err := cl.Mail(msg.GetSender()); err != nil {
 		return err
 	}
 
 	for _, e := range msg.GetRecipients() {
-		if err := c.Rcpt(e); err != nil {
+		if err := cl.Rcpt(e); err != nil {
 			return err
 		}
 	}
 
-	wc, err := c.Data()
+	wc, err := cl.Data()
 	if err != nil {
 		return err
 	}
@@ -119,6 +135,7 @@ func (sc *SmtpConnect) SendMailTLS(sender types.Email, to types.EmailAddresses, 
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
