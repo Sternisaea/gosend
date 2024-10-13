@@ -36,6 +36,9 @@ func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, 
 
 // Note: The certificate must support SAN (Subject Alternative Name)
 func (sc *SmtpConnect) SetPemCertificate(path types.FilePath) error {
+	if path == "" {
+		return nil
+	}
 	cert, err := os.ReadFile(path.String())
 	if err != nil {
 		return err

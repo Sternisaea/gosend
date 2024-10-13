@@ -14,6 +14,9 @@ import (
 type FilePath string
 
 func (fp *FilePath) Set(path string) error {
+	if path == "" {
+		return nil
+	}
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("file %s does not exist (%s)", path, err)
