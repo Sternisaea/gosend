@@ -29,6 +29,7 @@
 - `-to value`: Recipient TO address. Comma separate multiple email addresses or use multiple `-to` options.
 - `-cc value`: Recipient CC address. Comma separate multiple email addresses or use multiple `-cc` options.
 - `-bcc value`: Recipient BCC address. Comma separate multiple email addresses or use multiple `-bcc` options.
+- `-reply-to`: Reply-To address. Comma separate multiple email addresses or use multiple `-reply-to`options.
 - `-subject string`: Email subject.
 
 ### Message Body
