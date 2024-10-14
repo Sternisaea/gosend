@@ -11,14 +11,15 @@ import (
 )
 
 type Message struct {
-	from        string
-	to, cc, bcc []string
-	replyTo     []string
-	messageId   string
-	subject     string
-	plainText   string
-	htmlText    string
-	attachments []attachment
+	from          string
+	to, cc, bcc   []string
+	replyTo       []string
+	messageId     string
+	subject       string
+	plainText     string
+	htmlText      string
+	customHeaders []string
+	attachments   []attachment
 }
 
 type attachment struct {
@@ -62,6 +63,10 @@ func (msg *Message) SetMessageId(id string) {
 
 func (msg *Message) SetSubject(subject string) {
 	(*msg).subject = subject
+}
+
+func (msg *Message) AddCustomHeader(header string) {
+	(*msg).customHeaders = append((*msg).customHeaders, header)
 }
 
 func (msg *Message) SetBodyPlainText(plaintext string) {
@@ -125,6 +130,11 @@ func (msg *Message) GetContentText() (string, error) {
 			result += fmt.Sprintf("Message-ID: %s\r\n", (*msg).messageId)
 		}
 		result += "MIME-Version: 1.0\r\n"
+		for _, h := range (*msg).customHeaders {
+			if h != "" {
+				result += fmt.Sprintf("%s\r\n", h)
+			}
+		}
 		result += cnt.getContentPart("")
 	}
 	return result, nil

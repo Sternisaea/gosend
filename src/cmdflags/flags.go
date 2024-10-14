@@ -26,6 +26,7 @@ const (
 	flagBcc        = "bcc"
 	flagMessageId  = "message-id"
 	flagSubject    = "subject"
+	flagHeader     = "header"
 	flagBodyText   = "body-text"
 	flagBodyHtml   = "body-html"
 	flagAttachment = "attachment"
@@ -47,6 +48,7 @@ type Settings struct {
 	RecipientsBCC types.EmailAddresses
 	MessageID     string
 	Subject       string
+	Headers       types.Headers
 
 	BodyText    string
 	BodyHtml    string
@@ -128,6 +130,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.RecipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
 	flag.StringVar(&fs.MessageID, flagMessageId, "", "Custom Message-ID.")
 	flag.StringVar(&fs.Subject, flagSubject, "", "Email subject")
+	flag.Var(&fs.Headers, flagHeader, fmt.Sprintf("Custom header. Multiple -%s flags are allowed.", flagHeader))
 
 	flag.StringVar(&fs.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
 	flag.StringVar(&fs.BodyHtml, flagBodyHtml, "", "Body content in HTML.")

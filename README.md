@@ -29,8 +29,9 @@
 - `-to value`: Recipient TO address. Comma separate multiple email addresses or use multiple `-to` options.
 - `-cc value`: Recipient CC address. Comma separate multiple email addresses or use multiple `-cc` options.
 - `-bcc value`: Recipient BCC address. Comma separate multiple email addresses or use multiple `-bcc` options.
-- `-reply-to`: Reply-To address. Comma separate multiple email addresses or use multiple `-reply-to`options.
+- `-reply-to`: Reply-To address. Comma separate multiple email addresses or use multiple `-reply-to` options.
 - `-message-id`: Custom Message-ID.
+- `-header`: Custom header. Multiple `-header` flags are allowed..
 - `-subject string`: Email subject.
 
 ### Message Body
@@ -62,6 +63,7 @@
  -sender sender@example.com \
  -to receiver1@mail.com -to "receiver2@mail.com, receiver2@mail.org" \
  -cc "copy@mail.com" \
+ -header "X-Test: Test" \
  -subject "Your subject" \
  -body-text "Hi\n\nThis a plain text message." \
  -body-html "<h1>Hi</h1><p>This is a HTML message</p><img src=\"myimage.jpg\" alt=\"My image\">" \

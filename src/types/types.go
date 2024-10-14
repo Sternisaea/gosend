@@ -132,6 +132,18 @@ func (eas EmailAddresses) StringSlice() []string {
 	return emails
 }
 
+type Headers []string
+
+func (hs *Headers) Set(text string) error {
+	h := text
+	(*hs) = append((*hs), h)
+	return nil
+}
+
+func (hs Headers) String() string {
+	return strings.Join(hs, ", ")
+}
+
 type Attachments []FilePath
 
 func (at *Attachments) Set(attachments string) error {

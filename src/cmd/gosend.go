@@ -31,6 +31,9 @@ func main() {
 	msg.SetReplyTo(st.ReplyTo.StringSlice())
 	msg.SetSubject(st.Subject)
 	msg.SetMessageId(st.MessageID)
+	for _, h := range st.Headers {
+		msg.AddCustomHeader(h)
+	}
 	msg.SetBodyPlainText(st.BodyText)
 	msg.SetBodyHtml(st.BodyHtml)
 	for _, a := range st.Attachments {
