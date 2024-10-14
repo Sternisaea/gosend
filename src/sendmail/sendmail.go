@@ -51,18 +51,7 @@ func (sc *SmtpConnect) SetPemCertificate(path types.FilePath) error {
 	return nil
 }
 
-func (sc *SmtpConnect) SendMailTLS(sender types.Email, to types.EmailAddresses, cc types.EmailAddresses, bcc types.EmailAddresses, replyTo types.EmailAddresses, subject string, bodyText string, bodyHtml string, attachments []types.FilePath) error {
-	msg := message.NewMessage()
-	msg.SetSender(sender.String())
-	msg.SetRecipient(to.StringSlice(), cc.StringSlice(), bcc.StringSlice())
-	msg.SetSubject(subject)
-	msg.SetReplyTo(replyTo.StringSlice())
-	msg.SetBodyPlainText(bodyText)
-	msg.SetBodyHtml(bodyHtml)
-	for _, a := range attachments {
-		msg.AddAttachment(a.String())
-	}
-
+func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 	var errMsgs []string
 	if errMsg := (*sc).CheckServer(); errMsg != "" {
 		errMsgs = append(errMsgs, errMsg)

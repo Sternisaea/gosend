@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/Sternisaea/gosend/src/cmdflags"
+	"github.com/Sternisaea/gosend/src/message"
 	"github.com/Sternisaea/gosend/src/sendmail"
 )
 
@@ -24,7 +25,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = sc.SendMailTLS(st.Sender, st.RecipientsTo, st.RecipientsCC, st.RecipientsBCC, st.ReplyTo, st.Subject, st.BodyText, st.BodyHtml, st.Attachments)
+	msg := message.NewMessage()
+	msg.SetSender(st.Sender.String())
+	msg.SetRecipient(st.RecipientsTo.StringSlice(), st.RecipientsCC.StringSlice(), st.RecipientsBCC.StringSlice())
+	msg.SetSubject(st.Subject)
+	msg.SetReplyTo(st.ReplyTo.StringSlice())
+	msg.SetBodyPlainText(st.BodyText)
+	msg.SetBodyHtml(st.BodyHtml)
+	for _, a := range st.Attachments {
+		msg.AddAttachment(a.String())
+	}
+
+	err = sc.SendMailTLS(msg)
 	if err != nil {
 		log.Fatal(err)
 	}
