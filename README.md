@@ -1,9 +1,9 @@
-*10 october 2024*
+*14 october 2024*
 
 **WORK IN PROGRESS**
 
 # gosend
-**gosend** is a command line tool written in Go to send e-mails over STARTTLS or SSL/TLS. It supports plain text, HTML and attachments.
+**gosend** is a command line SMTP client written in Go to send e-mails over STARTTLS or SSL/TLS. It supports plain text, HTML and attachments.
 
 ## Flag Options
 
