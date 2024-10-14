@@ -129,7 +129,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.StringVar(&fs.MessageID, flagMessageId, "", "Custom Message-ID.")
 	flag.StringVar(&fs.Subject, flagSubject, "", "Email subject")
 
-	flag.StringVar(&fs.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \n.")
+	flag.StringVar(&fs.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
 	flag.StringVar(&fs.BodyHtml, flagBodyHtml, "", "Body content in HTML.")
 	flag.Var(&fs.Attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
 	flag.BoolVar(&fs.help, flagHelp, false, "Show flag options.")
