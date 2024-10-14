@@ -30,6 +30,7 @@
 - `-cc value`: Recipient CC address. Comma separate multiple email addresses or use multiple `-cc` options.
 - `-bcc value`: Recipient BCC address. Comma separate multiple email addresses or use multiple `-bcc` options.
 - `-reply-to`: Reply-To address. Comma separate multiple email addresses or use multiple `-reply-to`options.
+- `-message-id`: Custom Message-ID.
 - `-subject string`: Email subject.
 
 ### Message Body
@@ -46,7 +47,8 @@
 - To send multiple attachments you can either use multiple `-attachment`options or a `-attachment`option with comma separated files.
 - `-rootca`can be used when your mail server is using a self-signed certificate.
   - The X.509 certificate must be a PEM container file.
-  - Use *Subject Alternative Name* (SAN) fields in your self-signed certificate. 
+  - Use *Subject Alternative Name* (SAN) fields in your self-signed certificate.
+-  Normally the SMTP server creates a Message-ID for you. You can use `-message-id` when replying to an existing message to preserve the thread.
 
 ### Example
 

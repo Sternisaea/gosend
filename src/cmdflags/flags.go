@@ -24,6 +24,7 @@ const (
 	flagTo         = "to"
 	flagCc         = "cc"
 	flagBcc        = "bcc"
+	flagMessageId  = "message-id"
 	flagSubject    = "subject"
 	flagBodyText   = "body-text"
 	flagBodyHtml   = "body-html"
@@ -44,6 +45,7 @@ type Settings struct {
 	RecipientsTo  types.EmailAddresses
 	RecipientsCC  types.EmailAddresses
 	RecipientsBCC types.EmailAddresses
+	MessageID     string
 	Subject       string
 
 	BodyText    string
@@ -124,6 +126,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.RecipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
 	flag.Var(&fs.RecipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
 	flag.Var(&fs.RecipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
+	flag.StringVar(&fs.MessageID, flagMessageId, "", "Custom Message-ID.")
 	flag.StringVar(&fs.Subject, flagSubject, "", "Email subject")
 
 	flag.StringVar(&fs.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \n.")

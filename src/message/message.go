@@ -14,6 +14,7 @@ type Message struct {
 	from        string
 	to, cc, bcc []string
 	replyTo     []string
+	messageId   string
 	subject     string
 	plainText   string
 	htmlText    string
@@ -53,6 +54,10 @@ func (msg *Message) GetRecipients() []string {
 
 func (msg *Message) SetReplyTo(replyto []string) {
 	(*msg).replyTo = replyto
+}
+
+func (msg *Message) SetMessageId(id string) {
+	(*msg).messageId = id
 }
 
 func (msg *Message) SetSubject(subject string) {
@@ -115,6 +120,9 @@ func (msg *Message) GetContentText() (string, error) {
 		result += fmt.Sprintf("Subject: %s\r\n", (*msg).subject)
 		if len((*msg).replyTo) != 0 {
 			result += fmt.Sprintf("Reply-To: %s\r\n", strings.Join((*msg).replyTo, ","))
+		}
+		if (*msg).messageId != "" {
+			result += fmt.Sprintf("Message-ID: %s\r\n", (*msg).messageId)
 		}
 		result += "MIME-Version: 1.0\r\n"
 		result += cnt.getContentPart("")
