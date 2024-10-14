@@ -15,8 +15,8 @@ type Message struct {
 	to, cc, bcc []string
 	replyTo     []string
 	subject     string
-	plaintext   string
-	htmltext    string
+	plainText   string
+	htmlText    string
 	attachments []attachment
 }
 
@@ -60,11 +60,11 @@ func (msg *Message) SetSubject(subject string) {
 }
 
 func (msg *Message) SetBodyPlainText(plaintext string) {
-	(*msg).plaintext = plaintext
+	(*msg).plainText = plaintext
 }
 
 func (msg *Message) SetBodyHtml(htmltext string) {
-	(*msg).htmltext = htmltext
+	(*msg).htmlText = htmltext
 }
 
 func (msg *Message) AddAttachment(filePath string) string {
@@ -149,8 +149,8 @@ func (msg *Message) getContentTree() (*content, error) {
 
 func (msg *Message) getBodyContent() *content {
 	var pl, ht content
-	if (*msg).plaintext != "" {
-		plaintext := strings.ReplaceAll((*msg).plaintext, "\r\n", "\n")
+	if (*msg).plainText != "" {
+		plaintext := strings.ReplaceAll((*msg).plainText, "\r\n", "\n")
 		plaintext = strings.ReplaceAll(plaintext, "\n", "\r\n")
 		pl = content{
 			boundary: "",
@@ -159,8 +159,8 @@ func (msg *Message) getBodyContent() *content {
 			parts:    nil,
 		}
 	}
-	if (*msg).htmltext != "" {
-		htmltxt := (*msg).htmltext
+	if (*msg).htmlText != "" {
+		htmltxt := (*msg).htmlText
 		for _, a := range (*msg).attachments {
 			if a.contentID != "" {
 				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.filePath), fmt.Sprintf("\"cid:%s\"", a.contentID))
@@ -176,11 +176,11 @@ func (msg *Message) getBodyContent() *content {
 	}
 
 	switch true {
-	case (*msg).plaintext != "" && (*msg).htmltext == "":
+	case (*msg).plainText != "" && (*msg).htmlText == "":
 		return &pl
-	case (*msg).plaintext == "" && (*msg).htmltext != "":
+	case (*msg).plainText == "" && (*msg).htmlText != "":
 		return &ht
-	case (*msg).plaintext != "" && (*msg).htmltext != "":
+	case (*msg).plainText != "" && (*msg).htmlText != "":
 		bound := getRandomString(20)
 		return &content{
 			boundary: bound,
