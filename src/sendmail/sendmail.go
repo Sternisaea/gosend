@@ -72,6 +72,12 @@ func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 	var cl *smtp.Client
 	var err error
 	switch sc.auth {
+	case "":
+		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
+		if err != nil {
+			return err
+		}
+		defer cl.Close()
 	case types.STARTTLS:
 		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 		if err != nil {
@@ -140,7 +146,7 @@ func (sc *SmtpConnect) CheckServer() string {
 	if (*sc).port == 0 {
 		errMsgs = append(errMsgs, "No port provided")
 	}
-	if (*sc).auth == "" {
+	if (*sc).auth == "" && (*sc).hostname != "localhost" {
 		errMsgs = append(errMsgs, "No authentication method provided")
 	}
 	if (*sc).user == "" {
