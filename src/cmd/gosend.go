@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = sc.SendMailTLS(st.Sender, st.RecipientsTo, st.RecipientsCC, st.RecipientsBCC, st.Subject, st.BodyText, st.BodyHtml, st.Attachments)
+	err = sc.SendMailTLS(st.Sender, st.RecipientsTo, st.RecipientsCC, st.RecipientsBCC, st.ReplyTo, st.Subject, st.BodyText, st.BodyHtml, st.Attachments)
 	if err != nil {
 		log.Fatal(err)
 	}

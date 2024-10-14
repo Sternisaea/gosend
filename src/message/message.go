@@ -13,6 +13,7 @@ import (
 type Message struct {
 	from        string
 	to, cc, bcc []string
+	replyTo     []string
 	subject     string
 	plaintext   string
 	htmltext    string
@@ -48,6 +49,10 @@ func (msg *Message) GetRecipients() []string {
 	rcps := append((*msg).to, (*msg).cc...)
 	rcps = append(rcps, (*msg).bcc...)
 	return rcps
+}
+
+func (msg *Message) SetReplyTo(replyto []string) {
+	(*msg).replyTo = replyto
 }
 
 func (msg *Message) SetSubject(subject string) {
@@ -108,6 +113,9 @@ func (msg *Message) GetContentText() (string, error) {
 			result += fmt.Sprintf("Cc: %s\r\n", strings.Join((*msg).cc, ","))
 		}
 		result += fmt.Sprintf("Subject: %s\r\n", (*msg).subject)
+		if len((*msg).replyTo) != 0 {
+			result += fmt.Sprintf("Reply-To: %s\r\n", strings.Join((*msg).replyTo, ","))
+		}
 		result += "MIME-Version: 1.0\r\n"
 		result += cnt.getContentPart("")
 	}

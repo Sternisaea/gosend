@@ -20,6 +20,7 @@ const (
 	flagLogin      = "login"
 	flagPassword   = "password"
 	flagSender     = "sender"
+	flagReplyTo    = "reply-to"
 	flagTo         = "to"
 	flagCc         = "cc"
 	flagBcc        = "bcc"
@@ -37,8 +38,9 @@ type Settings struct {
 	AuthMethod types.AuthMethod
 	Login      string
 	Password   string
-	Sender     types.Email
 
+	Sender        types.Email
+	ReplyTo       types.EmailAddresses
 	RecipientsTo  types.EmailAddresses
 	RecipientsCC  types.EmailAddresses
 	RecipientsBCC types.EmailAddresses
@@ -115,7 +117,9 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.AuthMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s).", types.STARTTLS, types.SSLTLS))
 	flag.StringVar(&fs.Login, flagLogin, "", "Login username")
 	flag.StringVar(&fs.Password, flagPassword, "", "Login password.")
+
 	flag.Var(&fs.Sender, flagSender, "Email address of sender.")
+	flag.Var(&fs.ReplyTo, flagReplyTo, fmt.Sprintf("Reply-To address. Comma separate multiple email addresses or use multiple %s options.", flagReplyTo))
 
 	flag.Var(&fs.RecipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
 	flag.Var(&fs.RecipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
