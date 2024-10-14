@@ -28,8 +28,9 @@ func main() {
 	msg := message.NewMessage()
 	msg.SetSender(st.Sender.String())
 	msg.SetRecipient(st.RecipientsTo.StringSlice(), st.RecipientsCC.StringSlice(), st.RecipientsBCC.StringSlice())
-	msg.SetSubject(st.Subject)
 	msg.SetReplyTo(st.ReplyTo.StringSlice())
+	msg.SetSubject(st.Subject)
+	msg.SetMessageId(st.MessageID)
 	msg.SetBodyPlainText(st.BodyText)
 	msg.SetBodyHtml(st.BodyHtml)
 	for _, a := range st.Attachments {
