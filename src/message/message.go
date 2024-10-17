@@ -118,7 +118,7 @@ func (msg *Message) GetContentText() (string, error) {
 	}
 	result := ""
 	if cnt != nil {
-		result += fmt.Sprintf("From: %s\r\n", (*msg).from)
+		result += fmt.Sprintf("From: %s\r\n", (*msg).from.String())
 		result += fmt.Sprintf("To: %s\r\n", getMailAddressesAsString((*msg).to))
 		if len((*msg).cc) != 0 {
 			result += fmt.Sprintf("Cc: %s\r\n", getMailAddressesAsString((*msg).cc))
