@@ -15,8 +15,8 @@ const (
 	flagSmtpHost   = "smtp-host"
 	flagSmtpPort   = "smtp-port"
 	flagRootCA     = "rootca"
+	flagSecurity   = "security"
 	flagAuthFile   = "auth-file"
-	flagAuthMethod = "auth-method"
 	flagLogin      = "login"
 	flagPassword   = "password"
 	flagSender     = "sender"
@@ -34,12 +34,12 @@ const (
 )
 
 type Settings struct {
-	SmtpHost   types.DomainName
-	SmtpPort   types.TCPPort
-	RootCA     types.FilePath
-	AuthMethod types.AuthMethod
-	Login      string
-	Password   string
+	SmtpHost types.DomainName
+	SmtpPort types.TCPPort
+	RootCA   types.FilePath
+	Security types.Security
+	Login    string
+	Password string
 
 	Sender        types.Email
 	ReplyTo       types.EmailAddresses
@@ -90,8 +90,8 @@ func GetSettings() (*Settings, error) {
 			return nil, err
 		}
 	}
-	if fs.AuthMethod == "" {
-		if err := fs.AuthMethod.Set(opts[flagAuthMethod]); err != nil {
+	if fs.Security == "" {
+		if err := fs.Security.Set(opts[flagSecurity]); err != nil {
 			return nil, err
 		}
 	}
@@ -116,9 +116,9 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
 	flag.Var(&fs.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
 	flag.Var(&fs.RootCA, flagRootCA, "File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
+	flag.Var(&fs.Security, flagSecurity, fmt.Sprintf("Security protocol (%s, %s).", types.STARTTLS, types.SSLTLS))
 
 	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
-	flag.Var(&fs.AuthMethod, flagAuthMethod, fmt.Sprintf("Authentication method (%s, %s).", types.STARTTLS, types.SSLTLS))
 	flag.StringVar(&fs.Login, flagLogin, "", "Login username")
 	flag.StringVar(&fs.Password, flagPassword, "", "Login password.")
 

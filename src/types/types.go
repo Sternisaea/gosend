@@ -66,26 +66,26 @@ func (tp TCPPort) String() string {
 	return strconv.Itoa(int(tp))
 }
 
-type AuthMethod string
+type Security string
 
 const (
-	_        AuthMethod = ""
-	STARTTLS AuthMethod = "STARTTLS"
-	SSLTLS   AuthMethod = "SSL/TLS"
+	NOSECURITY Security = ""
+	STARTTLS   Security = "STARTTLS"
+	SSLTLS     Security = "SSL/TLS"
 )
 
-func (a *AuthMethod) Set(auth string) error {
-	switch strings.ToUpper(auth) {
+func (s *Security) Set(sec string) error {
+	switch strings.ToUpper(sec) {
 	case "", STARTTLS.String(), SSLTLS.String():
-		*a = AuthMethod(auth)
+		*s = Security(sec)
 		return nil
 	default:
-		return fmt.Errorf("invalid authentication method: %s (valid options are STARTTLS or SSL/TLS)", auth)
+		return fmt.Errorf("invalid security protocol: %s (valid options are STARTTLS or SSL/TLS)", sec)
 	}
 }
 
-func (a AuthMethod) String() string {
-	return string(a)
+func (s Security) String() string {
+	return string(s)
 }
 
 type Email string

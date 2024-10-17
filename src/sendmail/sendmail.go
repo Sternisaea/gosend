@@ -15,7 +15,7 @@ import (
 type SmtpConnect struct {
 	hostname   types.DomainName
 	port       types.TCPPort
-	auth       types.AuthMethod
+	security   types.Security
 	user       string
 	password   string
 	rootCAX509 *x509.CertPool
@@ -25,10 +25,10 @@ func NewSmtpConnect() *SmtpConnect {
 	return &SmtpConnect{}
 }
 
-func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, auth types.AuthMethod, login string, password string) error {
+func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, sec types.Security, login string, password string) error {
 	(*sc).hostname = hostname
 	(*sc).port = port
-	(*sc).auth = auth
+	(*sc).security = sec
 	(*sc).user = login
 	(*sc).password = password
 	return nil
@@ -71,7 +71,7 @@ func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 
 	var cl *smtp.Client
 	var err error
-	switch sc.auth {
+	switch sc.security {
 	case "":
 		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 		if err != nil {
@@ -146,8 +146,8 @@ func (sc *SmtpConnect) CheckServer() string {
 	if (*sc).port == 0 {
 		errMsgs = append(errMsgs, "No port provided")
 	}
-	if (*sc).auth == "" && (*sc).hostname != "localhost" {
-		errMsgs = append(errMsgs, "No authentication method provided")
+	if (*sc).security == "" && (*sc).hostname != "localhost" {
+		errMsgs = append(errMsgs, "No security protocol provided")
 	}
 	if (*sc).user == "" {
 		errMsgs = append(errMsgs, "No login user provided")
