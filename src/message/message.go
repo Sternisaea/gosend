@@ -168,7 +168,9 @@ func (msg *Message) getContentTree() (*content, error) {
 func (msg *Message) getBodyContent() *content {
 	var pl, ht content
 	if (*msg).plainText != "" {
-		plaintext := strings.ReplaceAll((*msg).plainText, "\r\n", "\n")
+		plaintext := strings.ReplaceAll((*msg).plainText, `\n`, "\n")
+		plaintext = strings.ReplaceAll(plaintext, `\r`, "")
+		plaintext = strings.ReplaceAll(plaintext, "\r\n", "\n")
 		plaintext = strings.ReplaceAll(plaintext, "\n", "\r\n")
 		pl = content{
 			boundary: "",
@@ -178,7 +180,10 @@ func (msg *Message) getBodyContent() *content {
 		}
 	}
 	if (*msg).htmlText != "" {
-		htmltxt := (*msg).htmlText
+		htmltxt := strings.ReplaceAll((*msg).htmlText, `\n`, "\n")
+		htmltxt = strings.ReplaceAll(htmltxt, `\r`, "")
+		htmltxt = strings.ReplaceAll(htmltxt, "\r\n", "\n")
+		htmltxt = strings.ReplaceAll(htmltxt, "\n", "\r\n")
 		for _, a := range (*msg).attachments {
 			if a.contentID != "" {
 				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.filePath), fmt.Sprintf("\"cid:%s\"", a.contentID))
