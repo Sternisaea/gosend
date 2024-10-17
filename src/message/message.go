@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type Message struct {
-	from          string
-	to, cc, bcc   []string
-	replyTo       []string
+	from          mail.Address
+	to, cc, bcc   []mail.Address
+	replyTo       []mail.Address
 	messageId     string
 	subject       string
 	plainText     string
@@ -33,27 +34,27 @@ func NewMessage() *Message {
 	return &Message{}
 }
 
-func (msg *Message) SetSender(from string) {
+func (msg *Message) SetSender(from mail.Address) {
 	(*msg).from = from
 }
 
-func (msg *Message) GetSender() string {
+func (msg *Message) GetSender() mail.Address {
 	return (*msg).from
 }
 
-func (msg *Message) SetRecipient(to, cc, bcc []string) {
+func (msg *Message) SetRecipient(to, cc, bcc []mail.Address) {
 	(*msg).to = to
 	(*msg).cc = cc
 	(*msg).bcc = bcc
 }
 
-func (msg *Message) GetRecipients() []string {
+func (msg *Message) GetAllRecipients() []mail.Address {
 	rcps := append((*msg).to, (*msg).cc...)
 	rcps = append(rcps, (*msg).bcc...)
 	return rcps
 }
 
-func (msg *Message) SetReplyTo(replyto []string) {
+func (msg *Message) SetReplyTo(replyto []mail.Address) {
 	(*msg).replyTo = replyto
 }
 
@@ -90,7 +91,7 @@ func (msg *Message) AddAttachmentWithContentType(filePath string, contentType st
 
 func (msg *Message) CheckMessage() string {
 	var errMsgs []string
-	if (*msg).from == "" {
+	if (*msg).from.Address == "" {
 		errMsgs = append(errMsgs, "No sender provided")
 	}
 	if len((*msg).to) == 0 {
@@ -118,13 +119,13 @@ func (msg *Message) GetContentText() (string, error) {
 	result := ""
 	if cnt != nil {
 		result += fmt.Sprintf("From: %s\r\n", (*msg).from)
-		result += fmt.Sprintf("To: %s\r\n", strings.Join((*msg).to, ","))
+		result += fmt.Sprintf("To: %s\r\n", getMailAddressesAsString((*msg).to))
 		if len((*msg).cc) != 0 {
-			result += fmt.Sprintf("Cc: %s\r\n", strings.Join((*msg).cc, ","))
+			result += fmt.Sprintf("Cc: %s\r\n", getMailAddressesAsString((*msg).cc))
 		}
 		result += fmt.Sprintf("Subject: %s\r\n", (*msg).subject)
 		if len((*msg).replyTo) != 0 {
-			result += fmt.Sprintf("Reply-To: %s\r\n", strings.Join((*msg).replyTo, ","))
+			result += fmt.Sprintf("Reply-To: %s\r\n", getMailAddressesAsString((*msg).replyTo))
 		}
 		if (*msg).messageId != "" {
 			result += fmt.Sprintf("Message-ID: %s\r\n", (*msg).messageId)
@@ -268,4 +269,12 @@ func getRandomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func getMailAddressesAsString(addrs []mail.Address) string {
+	var as []string
+	for _, a := range addrs {
+		as = append(as, a.String())
+	}
+	return strings.Join(as, ",")
 }

@@ -109,12 +109,12 @@ func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 		return err
 	}
 
-	if err := cl.Mail(msg.GetSender()); err != nil {
+	if err := cl.Mail(msg.GetSender().Address); err != nil {
 		return err
 	}
 
-	for _, e := range msg.GetRecipients() {
-		if err := cl.Rcpt(e); err != nil {
+	for _, e := range msg.GetAllRecipients() {
+		if err := cl.Rcpt(e.Address); err != nil {
 			return err
 		}
 	}

@@ -101,7 +101,7 @@ func GetSettings() (*Settings, error) {
 	if fs.Password == "" {
 		fs.Password = opts[flagPassword]
 	}
-	if fs.Sender == "" {
+	if fs.Sender.Address == "" {
 		if err := fs.Sender.Set(opts[flagSender]); err != nil {
 			return nil, err
 		}

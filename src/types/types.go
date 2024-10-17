@@ -88,19 +88,24 @@ func (a AuthMethod) String() string {
 	return string(a)
 }
 
-type Email string
+type Email mail.Address
 
 func (e *Email) Set(email string) error {
-	ea := strings.Trim(email, " ")
-	if _, err := mail.ParseAddress(ea); err != nil {
-		return fmt.Errorf("invalid email address: %s (%s)", ea, err)
+	if ea, err := mail.ParseAddress(strings.Trim(email, " ")); err != nil {
+		return fmt.Errorf("invalid email address: %s (%s)", email, err)
+	} else {
+		*e = Email(*ea)
 	}
-	*e = Email(ea)
 	return nil
 }
 
 func (e Email) String() string {
-	return string(e)
+	ea := mail.Address(e)
+	return (&ea).String()
+}
+
+func (e Email) GetMailAddress() mail.Address {
+	return mail.Address(e)
 }
 
 type EmailAddresses []Email
@@ -121,13 +126,17 @@ func (eas *EmailAddresses) Set(emails string) error {
 }
 
 func (eas EmailAddresses) String() string {
-	return strings.Join(eas.StringSlice(), ", ")
-}
-
-func (eas EmailAddresses) StringSlice() []string {
 	emails := make([]string, 0, len(eas))
 	for _, e := range eas {
 		emails = append(emails, e.String())
+	}
+	return strings.Join(emails, ", ")
+}
+
+func (eas EmailAddresses) GetMailAddresses() []mail.Address {
+	emails := make([]mail.Address, 0, len(eas))
+	for _, e := range eas {
+		emails = append(emails, e.GetMailAddress())
 	}
 	return emails
 }

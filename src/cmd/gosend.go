@@ -26,9 +26,9 @@ func main() {
 	}
 
 	msg := message.NewMessage()
-	msg.SetSender(st.Sender.String())
-	msg.SetRecipient(st.RecipientsTo.StringSlice(), st.RecipientsCC.StringSlice(), st.RecipientsBCC.StringSlice())
-	msg.SetReplyTo(st.ReplyTo.StringSlice())
+	msg.SetSender(st.Sender.GetMailAddress())
+	msg.SetRecipient(st.RecipientsTo.GetMailAddresses(), st.RecipientsCC.GetMailAddresses(), st.RecipientsBCC.GetMailAddresses())
+	msg.SetReplyTo(st.ReplyTo.GetMailAddresses())
 	msg.SetSubject(st.Subject)
 	msg.SetMessageId(st.MessageID)
 	for _, h := range st.Headers {
