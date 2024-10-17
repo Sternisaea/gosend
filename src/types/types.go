@@ -66,6 +66,27 @@ func (tp TCPPort) String() string {
 	return strconv.Itoa(int(tp))
 }
 
+type AuthenticationMethod string
+
+const (
+	NoAuthentication AuthenticationMethod = ""
+	PlainAuth        AuthenticationMethod = "plain"
+)
+
+func (a *AuthenticationMethod) Set(auth string) error {
+	switch strings.ToLower(auth) {
+	case NoAuthentication.String(), PlainAuth.String():
+		*a = AuthenticationMethod(auth)
+		return nil
+	default:
+		return fmt.Errorf("invalid authentication method: %s (valid options are: %s)", auth, PlainAuth)
+	}
+}
+
+func (a AuthenticationMethod) String() string {
+	return string(a)
+}
+
 type Security string
 
 const (
@@ -76,11 +97,11 @@ const (
 
 func (s *Security) Set(sec string) error {
 	switch strings.ToUpper(sec) {
-	case "", STARTTLS.String(), SSLTLS.String():
+	case NOSECURITY.String(), STARTTLS.String(), SSLTLS.String():
 		*s = Security(sec)
 		return nil
 	default:
-		return fmt.Errorf("invalid security protocol: %s (valid options are STARTTLS or SSL/TLS)", sec)
+		return fmt.Errorf("invalid security protocol: %s (valid options are %s or %s)", sec, STARTTLS, SSLTLS)
 	}
 }
 

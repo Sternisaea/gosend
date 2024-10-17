@@ -13,22 +13,24 @@ import (
 )
 
 type SmtpConnect struct {
-	hostname   types.DomainName
-	port       types.TCPPort
-	security   types.Security
-	user       string
-	password   string
-	rootCAX509 *x509.CertPool
+	hostname       types.DomainName
+	port           types.TCPPort
+	security       types.Security
+	authentication types.AuthenticationMethod
+	user           string
+	password       string
+	rootCAX509     *x509.CertPool
 }
 
 func NewSmtpConnect() *SmtpConnect {
 	return &SmtpConnect{}
 }
 
-func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, sec types.Security, login string, password string) error {
+func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, sec types.Security, auth types.AuthenticationMethod, login string, password string) error {
 	(*sc).hostname = hostname
 	(*sc).port = port
 	(*sc).security = sec
+	(*sc).authentication = auth
 	(*sc).user = login
 	(*sc).password = password
 	return nil

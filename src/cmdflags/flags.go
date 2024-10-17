@@ -17,6 +17,7 @@ const (
 	flagRootCA     = "rootca"
 	flagSecurity   = "security"
 	flagAuthFile   = "auth-file"
+	flagAuthMethod = "auth-method"
 	flagLogin      = "login"
 	flagPassword   = "password"
 	flagSender     = "sender"
@@ -34,12 +35,13 @@ const (
 )
 
 type Settings struct {
-	SmtpHost types.DomainName
-	SmtpPort types.TCPPort
-	RootCA   types.FilePath
-	Security types.Security
-	Login    string
-	Password string
+	SmtpHost       types.DomainName
+	SmtpPort       types.TCPPort
+	RootCA         types.FilePath
+	Security       types.Security
+	Authentication types.AuthenticationMethod
+	Login          string
+	Password       string
 
 	Sender        types.Email
 	ReplyTo       types.EmailAddresses
@@ -95,11 +97,13 @@ func GetSettings() (*Settings, error) {
 			return nil, err
 		}
 	}
-	if fs.Login == "" {
-		fs.Login = opts[flagLogin]
-	}
-	if fs.Password == "" {
-		fs.Password = opts[flagPassword]
+	if fs.Authentication != types.NoAuthentication {
+		if fs.Login == "" {
+			fs.Login = opts[flagLogin]
+		}
+		if fs.Password == "" {
+			fs.Password = opts[flagPassword]
+		}
 	}
 	if fs.Sender == "" {
 		if err := fs.Sender.Set(opts[flagSender]); err != nil {
@@ -119,6 +123,7 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
 	flag.Var(&fs.Security, flagSecurity, fmt.Sprintf("Security protocol (%s, %s).", types.STARTTLS, types.SSLTLS))
 
 	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
+	flag.Var(&fs.Authentication, flagAuthMethod, fmt.Sprintf("Authentication Method (%s).", types.PlainAuth))
 	flag.StringVar(&fs.Login, flagLogin, "", "Login username")
 	flag.StringVar(&fs.Password, flagPassword, "", "Login password.")
 
