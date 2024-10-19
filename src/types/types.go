@@ -66,26 +66,48 @@ func (tp TCPPort) String() string {
 	return strconv.Itoa(int(tp))
 }
 
-type AuthMethod string
+type AuthenticationMethod string
 
 const (
-	_        AuthMethod = ""
-	STARTTLS AuthMethod = "STARTTLS"
-	SSLTLS   AuthMethod = "SSL/TLS"
+	NoAuthentication AuthenticationMethod = ""
+	PlainAuth        AuthenticationMethod = "plain"
+	CramMd5Auth      AuthenticationMethod = "cram-md5"
 )
 
-func (a *AuthMethod) Set(auth string) error {
-	switch strings.ToUpper(auth) {
-	case "", STARTTLS.String(), SSLTLS.String():
-		*a = AuthMethod(auth)
+func (a *AuthenticationMethod) Set(auth string) error {
+	switch authentication := strings.ToLower(auth); authentication {
+	case NoAuthentication.String(), PlainAuth.String(), CramMd5Auth.String():
+		*a = AuthenticationMethod(authentication)
 		return nil
 	default:
-		return fmt.Errorf("invalid authentication method: %s (valid options are STARTTLS or SSL/TLS)", auth)
+		return fmt.Errorf("invalid authentication method: %s (valid options are: %s, %s)", auth, PlainAuth, CramMd5Auth)
 	}
 }
 
-func (a AuthMethod) String() string {
+func (a AuthenticationMethod) String() string {
 	return string(a)
+}
+
+type Security string
+
+const (
+	NoSecurity  Security = ""
+	StartTlsSec Security = "starttls"
+	SslTlsSec   Security = "ssl/tls"
+)
+
+func (s *Security) Set(sec string) error {
+	switch security := strings.ToLower(sec); security {
+	case NoSecurity.String(), StartTlsSec.String(), SslTlsSec.String():
+		*s = Security(security)
+		return nil
+	default:
+		return fmt.Errorf("invalid security protocol: %s (valid options are: %s, %s)", sec, StartTlsSec, SslTlsSec)
+	}
+}
+
+func (s Security) String() string {
+	return string(s)
 }
 
 type Email mail.Address

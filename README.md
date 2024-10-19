@@ -1,4 +1,4 @@
-*14 october 2024*
+*19 october 2024*
 
 **WORK IN PROGRESS**
 
@@ -15,11 +15,12 @@
 - `-smtp-host value`: Hostname of SMTP server.
 - `-smtp-port value`: TCP port of SMTP server.
 - `-rootca value`: File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.
+- `-security value`: Security protocol (STARTTLS, SSL/TLS).
 
 ### Authentication
 
 - `-auth-file value`: Path to authentication file.
-- `-auth-method value`: Authentication method (STARTTLS, SSL/TLS).
+- `-auth-method value`: Authentication Method (plain, CRUM-MD5).
 - `-login string`: Login username.
 - `-password string`: Login password.
 
@@ -42,8 +43,8 @@
 
 ### Notes
 
-- No authentication is only supported for `localhost`.
-- New lines in the `body-text` are supported by inserting `\n`in your text. These wil be converted to CR LF in your e-mail message.
+- Authentication method `plain` requires a secure connection (except for `localhost`).
+- New lines in the `body-text` and `body-html` are supported by inserting `\n`in your text. These wil be converted to CR LF in your e-mail message.
 - To send your e-mail to multiple recipients you can either use multiple `-to`options or a `-to`option with comma separated addresses.
 - To send multiple attachments you can either use multiple `-attachment`options or a `-attachment`option with comma separated files.
 - `-rootca`can be used when your mail server is using a self-signed certificate.
@@ -55,12 +56,13 @@
 
 ```bash
 ./gosend \
- -smtp-host mail.example.com
- -smtp-port 587
- -auth-method STARTTLS
- -login "your_username"
- -password "your_password"
- -sender sender@example.com \
+ -smtp-host mail.example.com  \
+ -smtp-port 587  \
+ -security STARTTLS \
+ -auth-method plain \
+ -login "your_username" \
+ -password "your_password" \
+ -sender "Sender<sender@example.com>" \
  -to receiver1@mail.com -to "receiver2@mail.com, receiver2@mail.org" \
  -cc "copy@mail.com" \
  -header "X-Test: Test" \
@@ -79,6 +81,7 @@ Supported flags are:
 - `smtp-host`
 - `smtp-port`
 - `rootca`
+- `security`
 - `auth-file`
 - `auth-method`
 - `login`
@@ -94,6 +97,8 @@ Supported flags are:
 ### Example
 
 ```ini
+security="ssl-tls"
+auth-method="plain"
 smtp-host="mail.example.com"
 smtp-port=587
 ```

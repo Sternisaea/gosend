@@ -13,22 +13,24 @@ import (
 )
 
 type SmtpConnect struct {
-	hostname   types.DomainName
-	port       types.TCPPort
-	auth       types.AuthMethod
-	user       string
-	password   string
-	rootCAX509 *x509.CertPool
+	hostname       types.DomainName
+	port           types.TCPPort
+	security       types.Security
+	authentication types.AuthenticationMethod
+	user           string
+	password       string
+	rootCAX509     *x509.CertPool
 }
 
 func NewSmtpConnect() *SmtpConnect {
 	return &SmtpConnect{}
 }
 
-func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, auth types.AuthMethod, login string, password string) error {
+func (sc *SmtpConnect) SetServer(hostname types.DomainName, port types.TCPPort, sec types.Security, auth types.AuthenticationMethod, login string, password string) error {
 	(*sc).hostname = hostname
 	(*sc).port = port
-	(*sc).auth = auth
+	(*sc).security = sec
+	(*sc).authentication = auth
 	(*sc).user = login
 	(*sc).password = password
 	return nil
@@ -51,7 +53,7 @@ func (sc *SmtpConnect) SetPemCertificate(path types.FilePath) error {
 	return nil
 }
 
-func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
+func (sc *SmtpConnect) SendMail(msg *message.Message) error {
 	var errMsgs []string
 	if errMsg := (*sc).CheckServer(); errMsg != "" {
 		errMsgs = append(errMsgs, errMsg)
@@ -63,35 +65,33 @@ func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 		return fmt.Errorf("checking errors: [%s]", strings.Join(errMsgs, "], ["))
 	}
 
-	auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname.String())
 	config := &tls.Config{
 		ServerName: (*sc).hostname.String(),
 		RootCAs:    (*sc).rootCAX509,
 	}
-
 	var cl *smtp.Client
 	var err error
-	switch sc.auth {
+	switch (*sc).security {
 	case "":
 		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 		if err != nil {
 			return err
 		}
 		defer cl.Close()
-	case types.STARTTLS:
+	case types.StartTlsSec:
 		cl, err = smtp.Dial(fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port))
 		if err != nil {
 			return err
 		}
 		defer cl.Close()
 
-		if ok, _ := cl.Extension(types.STARTTLS.String()); !ok {
-			return fmt.Errorf("server %s does not support %s", (*sc).hostname, types.STARTTLS)
+		if ok, _ := cl.Extension(types.StartTlsSec.String()); !ok {
+			return fmt.Errorf("server %s does not support %s", (*sc).hostname, types.StartTlsSec)
 		}
 		if err = cl.StartTLS(config); err != nil {
 			return err
 		}
-	case types.SSLTLS:
+	case types.SslTlsSec:
 		conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", (*sc).hostname, (*sc).port), config)
 		if err != nil {
 			return fmt.Errorf("server %s does not support SSL/TLS: %s", (*sc).hostname, err)
@@ -105,8 +105,18 @@ func (sc *SmtpConnect) SendMailTLS(msg *message.Message) error {
 		defer cl.Close()
 	}
 
-	if err = cl.Auth(auth); err != nil {
-		return err
+	switch (*sc).authentication {
+	case types.NoAuthentication:
+	case types.PlainAuth:
+		auth := smtp.PlainAuth("", (*sc).user, (*sc).password, (*sc).hostname.String())
+		if err = cl.Auth(auth); err != nil {
+			return err
+		}
+	case types.CramMd5Auth:
+		auth := smtp.CRAMMD5Auth((*sc).user, (*sc).password)
+		if err = cl.Auth(auth); err != nil {
+			return err
+		}
 	}
 
 	if err := cl.Mail(msg.GetSender().Address); err != nil {
@@ -146,14 +156,24 @@ func (sc *SmtpConnect) CheckServer() string {
 	if (*sc).port == 0 {
 		errMsgs = append(errMsgs, "No port provided")
 	}
-	if (*sc).auth == "" && (*sc).hostname != "localhost" {
-		errMsgs = append(errMsgs, "No authentication method provided")
+
+	if (*sc).security == types.NoSecurity {
+		if (*sc).authentication == types.PlainAuth && (*sc).hostname != "localhost" {
+			errMsgs = append(errMsgs, fmt.Sprintf("Authentication method '%s' is only allowed on an secure connection", types.PlainAuth.String()))
+		}
+	} else {
+		if (*sc).authentication == types.NoAuthentication {
+			errMsgs = append(errMsgs, "Authentication is required for security protocol '%s'", (*sc).security.String())
+		}
 	}
-	if (*sc).user == "" {
-		errMsgs = append(errMsgs, "No login user provided")
-	}
-	if (*sc).password == "" {
-		errMsgs = append(errMsgs, "No password provided")
+
+	if (*sc).authentication != types.NoAuthentication {
+		if (*sc).user == "" {
+			errMsgs = append(errMsgs, "No login user provided")
+		}
+		if (*sc).password == "" {
+			errMsgs = append(errMsgs, "No password provided")
+		}
 	}
 	if len(errMsgs) > 0 {
 		return fmt.Sprintf("Server: %s", strings.Join(errMsgs, ", "))

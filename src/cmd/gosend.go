@@ -18,7 +18,7 @@ func main() {
 	}
 
 	sc := sendmail.NewSmtpConnect()
-	if err := sc.SetServer(st.SmtpHost, st.SmtpPort, st.AuthMethod, st.Login, st.Password); err != nil {
+	if err := sc.SetServer(st.SmtpHost, st.SmtpPort, st.Security, st.Authentication, st.Login, st.Password); err != nil {
 		log.Fatal(err)
 	}
 	if err := sc.SetPemCertificate(st.RootCA); err != nil {
@@ -40,7 +40,7 @@ func main() {
 		msg.AddAttachment(a.String())
 	}
 
-	err = sc.SendMailTLS(msg)
+	err = sc.SendMail(msg)
 	if err != nil {
 		log.Fatal(err)
 	}
