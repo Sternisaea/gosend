@@ -100,13 +100,13 @@ func (msg *Message) CheckMessage() string {
 	if (*msg).subject == "" {
 		errMsgs = append(errMsgs, "No subject provided")
 	}
-	if len(errMsgs) > 0 {
-		return fmt.Sprintf("Message: %s", strings.Join(errMsgs, ", "))
-	}
 	for _, a := range (*msg).attachments {
 		if _, err := os.Stat(a.filePath); os.IsNotExist(err) {
 			errMsgs = append(errMsgs, fmt.Sprintf("Attachment file %s does not exist", a.filePath))
 		}
+	}
+	if len(errMsgs) > 0 {
+		return fmt.Sprintf("Message: %s", strings.Join(errMsgs, ", "))
 	}
 	return ""
 }
