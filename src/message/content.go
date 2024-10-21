@@ -1,12 +1,125 @@
 package message
 
-import "fmt"
+import (
+	"encoding/base64"
+	"fmt"
+	"math/rand"
+	"net/http"
+	"net/mail"
+	"os"
+	"strings"
+)
 
 type content struct {
 	boundary string
 	headers  []string
 	text     string
 	parts    *[]content
+}
+
+func (msg *Message) GetContentText() (string, error) {
+	cnt, err := (*msg).getContentTree()
+	if err != nil {
+		return "", err
+	}
+	result := ""
+	if cnt != nil {
+		result += fmt.Sprintf("From: %s\r\n", (*msg).from.String())
+		result += fmt.Sprintf("To: %s\r\n", getMailAddressesAsString((*msg).to))
+		if len((*msg).cc) != 0 {
+			result += fmt.Sprintf("Cc: %s\r\n", getMailAddressesAsString((*msg).cc))
+		}
+		result += fmt.Sprintf("Subject: %s\r\n", (*msg).subject)
+		if len((*msg).replyTo) != 0 {
+			result += fmt.Sprintf("Reply-To: %s\r\n", getMailAddressesAsString((*msg).replyTo))
+		}
+		if (*msg).messageId != "" {
+			result += fmt.Sprintf("Message-ID: %s\r\n", (*msg).messageId)
+		}
+		result += "MIME-Version: 1.0\r\n"
+		for _, h := range (*msg).customHeaders {
+			if h != "" {
+				result += fmt.Sprintf("%s\r\n", h)
+			}
+		}
+		result += cnt.getContentPart("")
+	}
+	return result, nil
+}
+
+func (msg *Message) getContentTree() (*content, error) {
+	body := msg.getBodyContent()
+	attachs, err := msg.getAttachmentContent()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(attachs) == 0 {
+		return body, nil
+	} else {
+		var prts []content
+		if body != nil {
+			prts = append(prts, *body)
+		}
+		prts = append(prts, attachs...)
+		bound := getRandomString(20)
+		return &content{
+			boundary: bound,
+			headers:  []string{fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"", bound)},
+			text:     "",
+			parts:    &prts,
+		}, nil
+	}
+}
+
+func (msg *Message) getBodyContent() *content {
+	var pl, ht content
+	if (*msg).plainText != "" {
+		plaintext := strings.ReplaceAll((*msg).plainText, `\n`, "\n")
+		plaintext = strings.ReplaceAll(plaintext, `\r`, "")
+		plaintext = strings.ReplaceAll(plaintext, "\r\n", "\n")
+		plaintext = strings.ReplaceAll(plaintext, "\n", "\r\n")
+		pl = content{
+			boundary: "",
+			headers:  []string{"contentType: Content-Type: text/plain; charset=\"UTF-8\"", "Content-Transfer-Encoding: 7bit"},
+			text:     plaintext,
+			parts:    nil,
+		}
+	}
+	if (*msg).htmlText != "" {
+		htmltxt := strings.ReplaceAll((*msg).htmlText, `\n`, "\n")
+		htmltxt = strings.ReplaceAll(htmltxt, `\r`, "")
+		htmltxt = strings.ReplaceAll(htmltxt, "\r\n", "\n")
+		htmltxt = strings.ReplaceAll(htmltxt, "\n", "\r\n")
+		for _, a := range (*msg).attachments {
+			if a.contentID != "" {
+				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.filePath), fmt.Sprintf("\"cid:%s\"", a.contentID))
+				htmltxt = strings.ReplaceAll(htmltxt, fmt.Sprintf("\"%s\"", a.fileName), fmt.Sprintf("\"cid:%s\"", a.contentID))
+			}
+		}
+		ht = content{
+			boundary: "",
+			headers:  []string{"Content-Type: text/html; charset=\"UTF-8\"", "Content-Transfer-Encoding: 7bit"},
+			text:     htmltxt,
+			parts:    nil,
+		}
+	}
+
+	switch true {
+	case (*msg).plainText != "" && (*msg).htmlText == "":
+		return &pl
+	case (*msg).plainText == "" && (*msg).htmlText != "":
+		return &ht
+	case (*msg).plainText != "" && (*msg).htmlText != "":
+		bound := getRandomString(20)
+		return &content{
+			boundary: bound,
+			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", bound)},
+			text:     "",
+			parts:    &[]content{pl, ht},
+		}
+	}
+	return nil
 }
 
 func (cnt *content) getContentPart(bound string) string {
@@ -34,4 +147,67 @@ func (cnt *content) getContentPart(bound string) string {
 		result += fmt.Sprintf("--%s--\r\n", (*cnt).boundary)
 	}
 	return result
+}
+
+func (msg *Message) getAttachmentContent() ([]content, error) {
+	var cnts []content
+	for i, a := range (*msg).attachments {
+		file, err := os.Open(a.filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		fileInfo, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		buffer := make([]byte, fileInfo.Size())
+		_, err = file.Read(buffer)
+		if err != nil {
+			return nil, err
+		}
+
+		if a.contentType == "" {
+			contentType := http.DetectContentType(buffer[:512])
+			(*msg).attachments[i].contentType = contentType
+			a.contentType = contentType
+		}
+
+		encoded := base64.StdEncoding.EncodeToString(buffer)
+
+		headers := make([]string, 0, 4)
+		headers = append(headers, fmt.Sprintf("Content-Type: %s; name=\"%s\"", a.contentType, a.fileName))
+		headers = append(headers, "Content-Transfer-Encoding: base64")
+		headers = append(headers, fmt.Sprintf("Content-Disposition: attachment; filename=\"%s\"", a.fileName))
+		if a.contentID != "" {
+			headers = append(headers, fmt.Sprintf("Content-ID: %s", a.contentID))
+		}
+
+		cnts = append(cnts, content{
+			boundary: "",
+			headers:  headers,
+			text:     encoded,
+			parts:    nil,
+		})
+	}
+	return cnts, nil
+}
+
+func getRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func getMailAddressesAsString(addrs []mail.Address) string {
+	var as []string
+	for _, a := range addrs {
+		as = append(as, a.String())
+	}
+	return strings.Join(as, ",")
 }
