@@ -17,7 +17,7 @@ type content struct {
 	parts    *[]content
 }
 
-func (msg *Message) GetContentText() (string, error) {
+func (msg *Message) getContentText() (string, error) {
 	cnt, err := (*msg).getContentTree()
 	if err != nil {
 		return "", err

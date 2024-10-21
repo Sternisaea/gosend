@@ -1,11 +1,12 @@
 package message
 
 import (
+	"errors"
 	"fmt"
 	"net/mail"
+	"net/smtp"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Message struct {
@@ -35,20 +36,16 @@ func (msg *Message) SetSender(from mail.Address) {
 	(*msg).from = from
 }
 
-func (msg *Message) GetSender() mail.Address {
-	return (*msg).from
-}
-
-func (msg *Message) SetRecipient(to, cc, bcc []mail.Address) {
+func (msg *Message) SetRecipientTo(to []mail.Address) {
 	(*msg).to = to
-	(*msg).cc = cc
-	(*msg).bcc = bcc
 }
 
-func (msg *Message) GetAllRecipients() []mail.Address {
-	rcps := append((*msg).to, (*msg).cc...)
-	rcps = append(rcps, (*msg).bcc...)
-	return rcps
+func (msg *Message) SetRecipientCC(cc []mail.Address) {
+	(*msg).cc = cc
+}
+
+func (msg *Message) SetRecipientBCC(bcc []mail.Address) {
+	(*msg).bcc = bcc
 }
 
 func (msg *Message) SetReplyTo(replyto []mail.Address) {
@@ -86,24 +83,59 @@ func (msg *Message) AddAttachmentWithContentType(filePath string, contentType st
 	return id
 }
 
-func (msg *Message) CheckMessage() string {
-	var errMsgs []string
+func (msg *Message) CheckMessage() error {
+	var errMsgs []error
 	if (*msg).from.Address == "" {
-		errMsgs = append(errMsgs, "No sender provided")
+		errMsgs = append(errMsgs, fmt.Errorf("no sender provided"))
 	}
 	if len((*msg).to) == 0 {
-		errMsgs = append(errMsgs, "No recipients provided")
+		errMsgs = append(errMsgs, fmt.Errorf("no recipients provided"))
 	}
 	if (*msg).subject == "" {
-		errMsgs = append(errMsgs, "No subject provided")
+		errMsgs = append(errMsgs, fmt.Errorf("no subject provided"))
 	}
 	for _, a := range (*msg).attachments {
 		if _, err := os.Stat(a.filePath); os.IsNotExist(err) {
-			errMsgs = append(errMsgs, fmt.Sprintf("Attachment file %s does not exist", a.filePath))
+			errMsgs = append(errMsgs, fmt.Errorf("attachment file %s does not exist", a.filePath))
 		}
 	}
-	if len(errMsgs) > 0 {
-		return fmt.Sprintf("Message: %s", strings.Join(errMsgs, ", "))
+	return errors.Join(errMsgs...)
+}
+
+func (msg *Message) SendContent(client *smtp.Client) error {
+	if err := msg.CheckMessage(); err != nil {
+		return err
 	}
-	return ""
+
+	if err := client.Mail(msg.from.Address); err != nil {
+		return err
+	}
+
+	for _, e := range msg.to {
+		if err := client.Rcpt(e.Address); err != nil {
+			return err
+		}
+	}
+	for _, e := range msg.cc {
+		if err := client.Rcpt(e.Address); err != nil {
+			return err
+		}
+	}
+
+	wc, err := client.Data()
+	if err != nil {
+		return err
+	}
+	defer wc.Close()
+
+	text, err := msg.getContentText()
+	if err != nil {
+		return err
+	}
+
+	_, err = wc.Write([]byte(text))
+	if err != nil {
+		return err
+	}
+	return nil
 }
