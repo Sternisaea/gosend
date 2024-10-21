@@ -121,6 +121,11 @@ func (msg *Message) SendContent(client *smtp.Client) error {
 			return err
 		}
 	}
+	for _, e := range msg.bcc {
+		if err := client.Rcpt(e.Address); err != nil {
+			return err
+		}
+	}
 
 	wc, err := client.Data()
 	if err != nil {
