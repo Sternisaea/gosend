@@ -60,15 +60,17 @@ type Settings struct {
 }
 
 func GetSettings() (*Settings, error) {
-	fs, serverFilePath, authFilePath := getFlagsettings()
+	settings, serverFilePath, authFilePath, err := getFlagsettings()
+	if err != nil {
+		os.Exit(2)
+	}
 
-	if fs.help {
-		flag.Usage()
+	if settings.help {
 		return nil, nil
 	}
 
 	opts := make(map[string]string)
-	opts, err := appendOptionsOfFile(opts, serverFilePath)
+	opts, err = appendOptionsOfFile(opts, serverFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -77,75 +79,87 @@ func GetSettings() (*Settings, error) {
 		return nil, err
 	}
 
-	if fs.SmtpHost == "" {
-		if err := fs.SmtpHost.Set(opts[flagSmtpHost]); err != nil {
+	if settings.SmtpHost == "" {
+		if err := settings.SmtpHost.Set(opts[flagSmtpHost]); err != nil {
 			return nil, err
 		}
 	}
-	if fs.SmtpPort == 0 {
-		if err := fs.SmtpPort.Set(opts[flagSmtpPort]); err != nil {
+	if settings.SmtpPort == 0 {
+		if err := settings.SmtpPort.Set(opts[flagSmtpPort]); err != nil {
 			return nil, err
 		}
 	}
-	if fs.RootCA == "" {
-		if err := fs.RootCA.Set(opts[flagRootCA]); err != nil {
+	if settings.RootCA == "" {
+		if err := settings.RootCA.Set(opts[flagRootCA]); err != nil {
 			return nil, err
 		}
 	}
-	if fs.Security == types.NoSecurity {
-		if err := fs.Security.Set(opts[flagSecurity]); err != nil {
+	if settings.Security == types.NoSecurity {
+		if err := settings.Security.Set(opts[flagSecurity]); err != nil {
 			return nil, err
 		}
 	}
-	if fs.Authentication == types.NoAuthentication {
-		if err := fs.Authentication.Set(opts[flagAuthMethod]); err != nil {
+	if settings.Authentication == types.NoAuthentication {
+		if err := settings.Authentication.Set(opts[flagAuthMethod]); err != nil {
 			return nil, err
 		}
 	}
-	if fs.Login == "" {
-		fs.Login = opts[flagLogin]
+	if settings.Login == "" {
+		settings.Login = opts[flagLogin]
 	}
-	if fs.Password == "" {
-		fs.Password = opts[flagPassword]
+	if settings.Password == "" {
+		settings.Password = opts[flagPassword]
 	}
-	if fs.Sender.Address == "" {
-		if err := fs.Sender.Set(opts[flagSender]); err != nil {
+	if settings.Sender.Address == "" {
+		if err := settings.Sender.Set(opts[flagSender]); err != nil {
 			return nil, err
 		}
 	}
-	return &fs, nil
+	return &settings, nil
 }
 
-func getFlagsettings() (Settings, types.FilePath, types.FilePath) {
+func getFlagsettings() (Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
-	var fs Settings
-	flag.Var(&serverFilePath, flagServerFile, "Path to settings file.")
-	flag.Var(&fs.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
-	flag.Var(&fs.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
-	flag.Var(&fs.RootCA, flagRootCA, "File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
-	flag.Var(&fs.Security, flagSecurity, fmt.Sprintf("Security protocol (%s, %s).", types.StartTlsSec, types.SslTlsSec))
+	var settings Settings
 
-	flag.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
-	flag.Var(&fs.Authentication, flagAuthMethod, fmt.Sprintf("Authentication Method (%s, %s).", types.PlainAuth, types.CramMd5Auth))
-	flag.StringVar(&fs.Login, flagLogin, "", "Login username")
-	flag.StringVar(&fs.Password, flagPassword, "", "Login password.")
+	fs := flag.NewFlagSet("cmdflags", flag.ContinueOnError)
+	fs.Usage = func() {} // Disable flags usage output
+	fs.Var(&serverFilePath, flagServerFile, "Path to settings file.")
+	fs.Var(&settings.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
+	fs.Var(&settings.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
+	fs.Var(&settings.RootCA, flagRootCA, "File path to X.509 certificate in PEM format for the Root CA when using a self-signed certificate on the mail server.")
+	fs.Var(&settings.Security, flagSecurity, fmt.Sprintf("Security protocol (%s, %s).", types.StartTlsSec, types.SslTlsSec))
 
-	flag.Var(&fs.Sender, flagSender, "Email address of sender.")
-	flag.Var(&fs.ReplyTo, flagReplyTo, fmt.Sprintf("Reply-To address. Comma separate multiple email addresses or use multiple %s options.", flagReplyTo))
+	fs.Var(&authFilePath, flagAuthFile, "Path to authentication file.")
+	fs.Var(&settings.Authentication, flagAuthMethod, fmt.Sprintf("Authentication Method (%s, %s).", types.PlainAuth, types.CramMd5Auth))
+	fs.StringVar(&settings.Login, flagLogin, "", "Login username")
+	fs.StringVar(&settings.Password, flagPassword, "", "Login password.")
 
-	flag.Var(&fs.RecipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
-	flag.Var(&fs.RecipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
-	flag.Var(&fs.RecipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
-	flag.StringVar(&fs.MessageID, flagMessageId, "", "Custom Message-ID.")
-	flag.StringVar(&fs.Subject, flagSubject, "", "Email subject")
-	flag.Var(&fs.Headers, flagHeader, fmt.Sprintf("Custom header. Multiple -%s flags are allowed.", flagHeader))
+	fs.Var(&settings.Sender, flagSender, "Email address of sender.")
+	fs.Var(&settings.ReplyTo, flagReplyTo, fmt.Sprintf("Reply-To address. Comma separate multiple email addresses or use multiple %s options.", flagReplyTo))
 
-	flag.StringVar(&fs.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
-	flag.StringVar(&fs.BodyHtml, flagBodyHtml, "", "Body content in HTML.")
-	flag.Var(&fs.Attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
-	flag.BoolVar(&fs.help, flagHelp, false, "Show flag options.")
-	flag.Parse()
-	return fs, serverFilePath, authFilePath
+	fs.Var(&settings.RecipientsTo, flagTo, fmt.Sprintf("Recipient TO address. Comma separate multiple email addresses or use multiple %s options.", flagTo))
+	fs.Var(&settings.RecipientsCC, flagCc, fmt.Sprintf("Recipient CC address. Comma separate multiple email addresses or use multiple %s options.", flagCc))
+	fs.Var(&settings.RecipientsBCC, flagBcc, fmt.Sprintf("Recipient BCC address. Comma separate multiple email addresses or use multiple %s options.", flagBcc))
+	fs.StringVar(&settings.MessageID, flagMessageId, "", "Custom Message-ID.")
+	fs.StringVar(&settings.Subject, flagSubject, "", "Email subject")
+	fs.Var(&settings.Headers, flagHeader, fmt.Sprintf("Custom header. Multiple -%s flags are allowed.", flagHeader))
+
+	fs.StringVar(&settings.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
+	fs.StringVar(&settings.BodyHtml, flagBodyHtml, "", "Body content in HTML.")
+	fs.Var(&settings.Attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
+	fs.BoolVar(&settings.help, flagHelp, false, "Show flag options.")
+
+	err := fs.Parse(os.Args[1:])
+	if err != nil {
+		return Settings{}, "", "", err
+	}
+
+	if settings.help {
+		fs.PrintDefaults() // Print flags usage
+		return settings, "", "", nil
+	}
+	return settings, serverFilePath, authFilePath, nil
 }
 
 func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[string]string, error) {
