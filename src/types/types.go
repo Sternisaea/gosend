@@ -11,6 +11,15 @@ import (
 	"golang.org/x/net/idna"
 )
 
+var (
+	ErrDomainInvalid = errors.New("invalid domain name")
+
+	maxPort           = int(^uint16(0))
+	ErrPortInvalid    = errors.New("invalid TCP port")
+	ErrPortNegative   = errors.New("port number cannot be negative")
+	ErrPortOutOfRange = fmt.Errorf("port number out of range (maximum port no. is %d)", maxPort)
+)
+
 type FilePath string
 
 func (fp *FilePath) Set(path string) error {
@@ -46,17 +55,18 @@ func (dn DomainName) String() string {
 	return string(dn)
 }
 
-var maxPort = int(^uint16(0))
-
 type TCPPort int
 
 func (tp *TCPPort) Set(portText string) error {
 	p, err := strconv.Atoi(portText)
 	if err != nil {
-		return fmt.Errorf("invalid SMTP TCP port %s (%s)", portText, err)
+		return ErrPortInvalid
+	}
+	if p < 0 {
+		return ErrPortNegative
 	}
 	if p > maxPort {
-		return fmt.Errorf("port number %d out of range (maximum port no. is %d)", p, maxPort)
+		return ErrPortOutOfRange
 	}
 	*tp = TCPPort(p)
 	return nil
