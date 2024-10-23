@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -62,6 +63,7 @@ type Settings struct {
 func GetSettings() (*Settings, error) {
 	settings, serverFilePath, authFilePath, err := getFlagsettings()
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(2)
 	}
 
@@ -123,7 +125,8 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath, error) {
 	var settings Settings
 
 	fs := flag.NewFlagSet("cmdflags", flag.ContinueOnError)
-	fs.Usage = func() {} // Disable flags usage output
+	fs.Usage = func() {}     // Disable flags usage output
+	fs.SetOutput(io.Discard) // Disable text output
 	fs.Var(&serverFilePath, flagServerFile, "Path to settings file.")
 	fs.Var(&settings.SmtpHost, flagSmtpHost, "Hostname of SMTP server.")
 	fs.Var(&settings.SmtpPort, flagSmtpPort, "TCP port of SMTP server.")
@@ -156,7 +159,8 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath, error) {
 	}
 
 	if settings.help {
-		fs.PrintDefaults() // Print flags usage
+		fs.SetOutput(os.Stdout) // Enable text output
+		fs.PrintDefaults()      // Print flags usage
 		return settings, "", "", nil
 	}
 	return settings, serverFilePath, authFilePath, nil
