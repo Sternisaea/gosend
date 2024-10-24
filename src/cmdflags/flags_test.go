@@ -1,6 +1,7 @@
 package cmdflags
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -45,11 +46,16 @@ func Test_getFlagsettings(t *testing.T) {
 		t.Errorf("Cannot remove file %s", err)
 	}
 
+	headerLength := "X-Length: "
+	headerIsMax := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)))
+	headerOverMax := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)+1))
+
 	options := []option{
 		OptOk(t, "empty", flagSmtpHost, "", Settings{}),
 		OptOk(t, "normal", flagSmtpHost, "domain.com", Settings{SmtpHost: "domain.com"}),
 		OptOk(t, "non-tld", flagSmtpHost, "domain", Settings{SmtpHost: "domain"}),
 		OptErr(t, "directory", flagSmtpHost, "domain.com/dir", types.ErrDomainInvalid),
+		OptErr(t, "double quoted", flagSmtpHost, `"domain.com"`, types.ErrDomainInvalid),
 
 		OptOk(t, "regular", flagSmtpPort, "587", Settings{SmtpPort: 587}),
 		OptErr(t, "negative", flagSmtpPort, "-1", types.ErrPortNegative),
@@ -115,7 +121,16 @@ func Test_getFlagsettings(t *testing.T) {
 		OptOk(t, "unicode", flagSubject, "件名", Settings{Subject: "件名"}),
 		OptOk(t, "special", flagSubject, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{Subject: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
 
-		// OptOk(t, "header", flagHeader, "X-Custom-Header: value", Settings{Header: "X-Custom-Header: value"}),
+		OptOk(t, "custom", flagHeader, "X-Test: testing", Settings{Headers: types.Headers{"X-Test: testing"}}),
+		OptErr(t, "empty", flagHeader, "", types.ErrHeaderEmpty),
+		OptErr(t, "name empty", flagHeader, " : testing", types.ErrHeaderNameEmpty),
+		OptErr(t, "body empty", flagHeader, "X-Test: ", types.ErrHeaderBodyEmpty),
+		OptErr(t, "no colons", flagHeader, "X-Test testing", types.ErrHeaderNoColon),
+		OptErr(t, "2 colons", flagHeader, "X-Test: X-Custom: testing", types.ErrHeaderMultipleColons),
+		OptErr(t, "illegal name", flagHeader, "X-試験: testing", types.ErrHeaderNameIllegalChars),
+		OptErr(t, "illegal body", flagHeader, "X-Test: 試験", types.ErrHeaderBodyIllegalChars),
+		OptOk(t, "length max", flagHeader, headerIsMax, Settings{Headers: types.Headers{types.Header(headerIsMax)}}),
+		OptErr(t, "length max+1", flagHeader, headerOverMax, types.ErrHeaderLineTooLong),
 
 		// OptOk(t, "body-text", flagBodyText, "This is a plain text body.", Settings{BodyText: "This is a plain text body."}),
 
@@ -136,6 +151,7 @@ func Test_getFlagsettings(t *testing.T) {
 			if opt.expectedError == nil {
 				if err != nil {
 					t.Errorf("Expected no error, got %s", err)
+					return
 				}
 			} else {
 				if err == nil {
@@ -146,6 +162,7 @@ func Test_getFlagsettings(t *testing.T) {
 						t.Errorf("Expected error %s, got %s", opt.expectedError, err.Error())
 					}
 				}
+				return
 			}
 
 			if !reflect.DeepEqual(settings, opt.expectedSettings) {
@@ -189,7 +206,6 @@ func OptErr(t testing.TB, name, flag, value string, expErr error) option {
 		expectedSettings:       Settings{},
 		expectedServerFilePath: "",
 		expectedAuthFilePath:   "",
-		// expectedErrorMessage:   "invalid value \"" + value + "\" for flag -" + flag + ": " + errMsg,
-		expectedError: expErr,
+		expectedError:          expErr,
 	}
 }
