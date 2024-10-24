@@ -47,7 +47,7 @@ func getMessage(st *cmdflags.Settings) (*message.Message, error) {
 	msg.SetSubject(st.Subject)
 	msg.SetMessageId(st.MessageID)
 	for _, h := range st.Headers {
-		msg.AddCustomHeader(h)
+		msg.AddCustomHeader(h.String())
 	}
 	msg.SetBodyPlainText(st.BodyText)
 	msg.SetBodyHtml(st.BodyHtml)

@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"net/mail"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/idna"
+)
+
+var (
+	maxLineLength = 78
+	maxPort       = int(^uint16(0))
 )
 
 var (
@@ -17,7 +23,6 @@ var (
 
 	ErrDomainInvalid = errors.New("invalid domain name")
 
-	maxPort           = int(^uint16(0))
 	ErrPortInvalid    = errors.New("invalid TCP port")
 	ErrPortNegative   = errors.New("port number cannot be negative")
 	ErrPortOutOfRange = fmt.Errorf("port number out of range (maximum port no. is %d)", maxPort)
@@ -28,6 +33,20 @@ var (
 	ErrEmailInvalid = errors.New("invalid email address")
 
 	ErrAttachmentInvalid = errors.New("invalid attachment")
+
+	ErrHeaderEmpty            = errors.New("header is empty")
+	ErrHeaderNoColon          = errors.New("header must contain a colon")
+	ErrHeaderMultipleColons   = errors.New("header has multiple colons")
+	ErrHeaderNameEmpty        = errors.New("header name is empty")
+	ErrHeaderNameIllegalChars = errors.New("header name contains illegal characters")
+	ErrHeaderBodyEmpty        = errors.New("header body is empty")
+	ErrHeaderBodyIllegalChars = errors.New("header body contains illegal characters")
+	ErrHeaderLineTooLong      = fmt.Errorf("header line exceeds maximum lenght of %d", maxLineLength)
+)
+
+var (
+	printableAscii         = regexp.MustCompile(`^[\x21-\x7E]+$`)
+	printableAsciiSpaceTab = regexp.MustCompile(`^[\x09\x20-\x7E]+$`)
 )
 
 type FilePath string
@@ -183,16 +202,83 @@ func (eas EmailAddresses) GetMailAddresses() []mail.Address {
 	return emails
 }
 
-type Headers []string
+type Header string
+
+func (h *Header) Set(text string) error {
+	if err := CheckHeader(text); err != nil {
+		return err
+	}
+	*h = Header(text)
+	return nil
+}
+
+func (h *Header) String() string {
+	return string(*h)
+}
+
+func CheckHeader(text string) error {
+	// RFC5322
+	if text == "" {
+		return ErrHeaderEmpty
+	}
+	parts := strings.SplitAfter(text, ":")
+	if len(parts) == 1 {
+		return ErrHeaderNoColon
+	}
+	if len(parts) > 2 {
+		return ErrHeaderMultipleColons
+	}
+
+	lines := strings.SplitAfter(text, "\r\n")
+	for i, line := range lines {
+		if len(line) > maxLineLength {
+			return ErrHeaderLineTooLong
+		}
+
+		var body string
+		if i == 0 {
+			parts := strings.SplitAfter(line, ":")
+			name := strings.TrimSpace(parts[0])
+			body = strings.TrimSpace(parts[1])
+
+			if name == "" {
+				return ErrHeaderNameEmpty
+			}
+			if !printableAscii.MatchString(name) {
+				return ErrHeaderNameIllegalChars
+			}
+		} else {
+			body = line
+		}
+
+		if body == "" {
+			return ErrHeaderBodyEmpty
+		}
+		if !printableAsciiSpaceTab.MatchString(body) {
+			return ErrHeaderBodyIllegalChars
+		}
+
+	}
+	return nil
+}
+
+type Headers []Header
 
 func (hs *Headers) Set(text string) error {
-	h := text
+	var h Header
+	if err := h.Set(text); err != nil {
+		return err
+	}
 	(*hs) = append((*hs), h)
 	return nil
 }
 
 func (hs Headers) String() string {
-	return strings.Join(hs, ", ")
+	headers := make([]string, 0, len(hs))
+	for _, h := range hs {
+		headers = append(headers, h.String())
+	}
+	return strings.Join(headers, ", ")
 }
 
 type Attachments []FilePath
