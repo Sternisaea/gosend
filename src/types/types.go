@@ -12,12 +12,22 @@ import (
 )
 
 var (
+	ErrFileNotExist = errors.New("file does not exist")
+	ErrFile         = errors.New("file error")
+
 	ErrDomainInvalid = errors.New("invalid domain name")
 
 	maxPort           = int(^uint16(0))
 	ErrPortInvalid    = errors.New("invalid TCP port")
 	ErrPortNegative   = errors.New("port number cannot be negative")
 	ErrPortOutOfRange = fmt.Errorf("port number out of range (maximum port no. is %d)", maxPort)
+
+	ErrSecurityInvalid       = errors.New("invalid security protocol")
+	ErrAuthenticationInvalid = errors.New("invalid authentication method")
+
+	ErrEmailInvalid = errors.New("invalid email address")
+
+	ErrAttachmentInvalid = errors.New("invalid attachment")
 )
 
 type FilePath string
@@ -28,9 +38,9 @@ func (fp *FilePath) Set(path string) error {
 	}
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("file %s does not exist (%s)", path, err)
+			return fmt.Errorf("%w: %w", ErrFileNotExist, err)
 		}
-		return fmt.Errorf("error file %s (%s)", path, err)
+		return fmt.Errorf("%w: %w", ErrFile, err)
 	}
 	*fp = FilePath(path)
 	return nil
@@ -45,7 +55,7 @@ type DomainName string
 func (dn *DomainName) Set(host string) error {
 	d, err := idna.Lookup.ToASCII(host)
 	if err != nil {
-		return fmt.Errorf("invalid domain name: %s (%s)", host, err)
+		return fmt.Errorf("%w: %w", ErrDomainInvalid, err)
 	}
 	*dn = DomainName(d)
 	return nil
@@ -60,13 +70,13 @@ type TCPPort int
 func (tp *TCPPort) Set(portText string) error {
 	p, err := strconv.Atoi(portText)
 	if err != nil {
-		return ErrPortInvalid
+		return fmt.Errorf("%w: %w", ErrPortInvalid, err)
 	}
 	if p < 0 {
-		return ErrPortNegative
+		return fmt.Errorf("%w", ErrPortNegative)
 	}
 	if p > maxPort {
-		return ErrPortOutOfRange
+		return fmt.Errorf("%w", ErrPortOutOfRange)
 	}
 	*tp = TCPPort(p)
 	return nil
@@ -74,28 +84,6 @@ func (tp *TCPPort) Set(portText string) error {
 
 func (tp TCPPort) String() string {
 	return strconv.Itoa(int(tp))
-}
-
-type AuthenticationMethod string
-
-const (
-	NoAuthentication AuthenticationMethod = ""
-	PlainAuth        AuthenticationMethod = "plain"
-	CramMd5Auth      AuthenticationMethod = "cram-md5"
-)
-
-func (a *AuthenticationMethod) Set(auth string) error {
-	switch authentication := strings.ToLower(auth); authentication {
-	case NoAuthentication.String(), PlainAuth.String(), CramMd5Auth.String():
-		*a = AuthenticationMethod(authentication)
-		return nil
-	default:
-		return fmt.Errorf("invalid authentication method: %s (valid options are: %s, %s)", auth, PlainAuth, CramMd5Auth)
-	}
-}
-
-func (a AuthenticationMethod) String() string {
-	return string(a)
 }
 
 type Security string
@@ -112,7 +100,7 @@ func (s *Security) Set(sec string) error {
 		*s = Security(security)
 		return nil
 	default:
-		return fmt.Errorf("invalid security protocol: %s (valid options are: %s, %s)", sec, StartTlsSec, SslTlsSec)
+		return fmt.Errorf("%w", ErrSecurityInvalid)
 	}
 }
 
@@ -120,11 +108,33 @@ func (s Security) String() string {
 	return string(s)
 }
 
+type AuthenticationMethod string
+
+const (
+	NoAuthentication AuthenticationMethod = ""
+	PlainAuth        AuthenticationMethod = "plain"
+	CramMd5Auth      AuthenticationMethod = "cram-md5"
+)
+
+func (a *AuthenticationMethod) Set(auth string) error {
+	switch authentication := strings.ToLower(auth); authentication {
+	case NoAuthentication.String(), PlainAuth.String(), CramMd5Auth.String():
+		*a = AuthenticationMethod(authentication)
+		return nil
+	default:
+		return fmt.Errorf("%w", ErrAuthenticationInvalid)
+	}
+}
+
+func (a AuthenticationMethod) String() string {
+	return string(a)
+}
+
 type Email mail.Address
 
 func (e *Email) Set(email string) error {
 	if ea, err := mail.ParseAddress(strings.Trim(email, " ")); err != nil {
-		return fmt.Errorf("invalid email address: %s (%s)", email, err)
+		return fmt.Errorf("%w: %w", ErrEmailInvalid, err)
 	} else {
 		*e = Email(*ea)
 	}
@@ -193,7 +203,7 @@ func (at *Attachments) Set(attachments string) error {
 		if attach != "" {
 			var fp FilePath
 			if err := fp.Set(attach); err != nil {
-				return fmt.Errorf("invalid attachment: %s (%s)", attach, err)
+				return fmt.Errorf("%w: %w", ErrAttachmentInvalid, err)
 			}
 			*at = append(*at, fp)
 		}
