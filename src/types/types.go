@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	maxLineLength = 78
+	MaxLineLength = 78
 	maxPort       = int(^uint16(0))
 )
 
@@ -41,7 +41,7 @@ var (
 	ErrHeaderNameIllegalChars = errors.New("header name contains illegal characters")
 	ErrHeaderBodyEmpty        = errors.New("header body is empty")
 	ErrHeaderBodyIllegalChars = errors.New("header body contains illegal characters")
-	ErrHeaderLineTooLong      = fmt.Errorf("header line exceeds maximum lenght of %d", maxLineLength)
+	ErrHeaderLineTooLong      = fmt.Errorf("header line exceeds maximum lenght of %d", MaxLineLength)
 )
 
 var (
@@ -172,7 +172,7 @@ func (e Email) GetMailAddress() mail.Address {
 type EmailAddresses []Email
 
 func (eas *EmailAddresses) Set(emails string) error {
-	for _, e := range strings.Split(emails, ",") {
+	for _, e := range strings.SplitN(emails, ",", -1) {
 		em := strings.TrimSpace(e)
 		if em != "" {
 			var email Email
@@ -221,7 +221,7 @@ func CheckHeader(text string) error {
 	if text == "" {
 		return ErrHeaderEmpty
 	}
-	parts := strings.SplitAfter(text, ":")
+	parts := strings.SplitN(text, ":", -1)
 	if len(parts) == 1 {
 		return ErrHeaderNoColon
 	}
@@ -229,15 +229,15 @@ func CheckHeader(text string) error {
 		return ErrHeaderMultipleColons
 	}
 
-	lines := strings.SplitAfter(text, "\r\n")
+	lines := strings.SplitN(text, "\r\n", -1)
 	for i, line := range lines {
-		if len(line) > maxLineLength {
+		if len(line) > MaxLineLength {
 			return ErrHeaderLineTooLong
 		}
 
 		var body string
 		if i == 0 {
-			parts := strings.SplitAfter(line, ":")
+			parts := strings.SplitN(line, ":", -1)
 			name := strings.TrimSpace(parts[0])
 			body = strings.TrimSpace(parts[1])
 
@@ -284,7 +284,7 @@ func (hs Headers) String() string {
 type Attachments []FilePath
 
 func (at *Attachments) Set(attachments string) error {
-	for _, a := range strings.Split(attachments, ",") {
+	for _, a := range strings.SplitN(attachments, ",", -1) {
 		attach := strings.TrimSpace(a)
 		if attach != "" {
 			var fp FilePath
