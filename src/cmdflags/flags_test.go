@@ -3,6 +3,7 @@ package cmdflags
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Sternisaea/gosend/src/types"
@@ -14,7 +15,7 @@ type option struct {
 	expectedSettings       Settings
 	expectedServerFilePath types.FilePath
 	expectedAuthFilePath   types.FilePath
-	expectedErrorMessage   string
+	expectedError          error
 }
 
 func Test_getFlagsettings(t *testing.T) {
@@ -44,67 +45,107 @@ func Test_getFlagsettings(t *testing.T) {
 		t.Errorf("Cannot remove file %s", err)
 	}
 
-	options := make([]option, 0, 100)
-	options = append(options, OptOk(t, "empty", flagSmtpHost, "", Settings{}))
-	options = append(options, OptOk(t, "normal", flagSmtpHost, "domain.com", Settings{SmtpHost: "domain.com"}))
-	options = append(options, OptOk(t, "non-tld", flagSmtpHost, "domain", Settings{SmtpHost: "domain"}))
-	options = append(options, OptErr(t, "directory", flagSmtpHost, "domain.com/dir", "invalid domain name: domain.com/dir (idna: disallowed rune U+002F)"))
+	options := []option{
+		OptOk(t, "empty", flagSmtpHost, "", Settings{}),
+		OptOk(t, "normal", flagSmtpHost, "domain.com", Settings{SmtpHost: "domain.com"}),
+		OptOk(t, "non-tld", flagSmtpHost, "domain", Settings{SmtpHost: "domain"}),
+		OptErr(t, "directory", flagSmtpHost, "domain.com/dir", types.ErrDomainInvalid),
 
-	options = append(options, OptOk(t, "regular", flagSmtpPort, "587", Settings{SmtpPort: 587}))
-	options = append(options, OptErr(t, "negative", flagSmtpPort, "-1", types.ErrPortNegative.Error()))
-	options = append(options, OptErr(t, "out of range", flagSmtpPort, "65536", types.ErrPortOutOfRange.Error()))
+		OptOk(t, "regular", flagSmtpPort, "587", Settings{SmtpPort: 587}),
+		OptErr(t, "negative", flagSmtpPort, "-1", types.ErrPortNegative),
+		OptErr(t, "out of range", flagSmtpPort, "65536", types.ErrPortOutOfRange),
+		OptErr(t, "empty", flagSmtpPort, "", types.ErrPortInvalid),
 
-	options = append(options, OptOk(t, "existing", flagRootCA, tmpExistingFile.Name(), Settings{RootCA: types.FilePath(tmpExistingFile.Name())}))
-	options = append(options, OptErr(t, "non-existing", flagRootCA, tmpNonExistingFile.Name(), "file "+tmpNonExistingFile.Name()+" does not exist (stat "+tmpNonExistingFile.Name()+": no such file or directory)"))
+		OptOk(t, "existing", flagRootCA, tmpExistingFile.Name(), Settings{RootCA: types.FilePath(tmpExistingFile.Name())}),
+		OptErr(t, "non-existing", flagRootCA, tmpNonExistingFile.Name(), types.ErrFileNotExist),
 
-	options = append(options, OptOk(t, "none", flagSecurity, string(types.NoSecurity), Settings{Security: types.NoSecurity}))
-	options = append(options, OptOk(t, "StartTLS", flagSecurity, string(types.StartTlsSec), Settings{Security: types.StartTlsSec}))
-	options = append(options, OptOk(t, "SSLTLS", flagSecurity, string(types.SslTlsSec), Settings{Security: types.SslTlsSec}))
-	options = append(options, OptErr(t, "invalid", flagSecurity, "INVALID", "invalid security protocol: INVALID (valid options are: starttls, ssl/tls)"))
+		OptOk(t, "none", flagSecurity, string(types.NoSecurity), Settings{Security: types.NoSecurity}),
+		OptOk(t, "StartTLS", flagSecurity, string(types.StartTlsSec), Settings{Security: types.StartTlsSec}),
+		OptOk(t, "SSLTLS", flagSecurity, string(types.SslTlsSec), Settings{Security: types.SslTlsSec}),
+		OptErr(t, "invalid", flagSecurity, "INVALID", types.ErrSecurityInvalid),
 
-	// options = append(options, OptOk(t, "auth method", flagAuthMethod, "PLAIN", Settings{AuthMethod: "PLAIN"}))
-	// options = append(options, OptErr(t, "invalid auth method", flagAuthMethod, "INVALID", "unsupported authentication method: INVALID"))
+		OptOk(t, "none", flagAuthMethod, string(types.NoAuthentication), Settings{Authentication: types.NoAuthentication}),
+		OptOk(t, "plain", flagAuthMethod, string(types.PlainAuth), Settings{Authentication: types.PlainAuth}),
+		OptOk(t, "crammd5", flagAuthMethod, string(types.CramMd5Auth), Settings{Authentication: types.CramMd5Auth}),
+		OptErr(t, "invalid", flagAuthMethod, "INVALID", types.ErrAuthenticationInvalid),
 
-	// options = append(options, OptOk(t, "login", flagLogin, "user@example.com", Settings{Login: "user@example.com"}))
+		OptOk(t, "empty", flagLogin, "", Settings{}),
+		OptOk(t, "regular", flagLogin, "My Name", Settings{Login: "My Name"}),
+		OptOk(t, "unicode", flagLogin, "私の名前", Settings{Login: "私の名前"}),
+		OptOk(t, "email", flagLogin, "user@example.com", Settings{Login: "user@example.com"}),
 
-	// options = append(options, OptOk(t, "password", flagPassword, "password123", Settings{Password: "password123"}))
+		OptOk(t, "empty", flagPassword, "", Settings{}),
+		OptOk(t, "regular", flagPassword, "MySecret", Settings{Password: "MySecret"}),
+		OptOk(t, "unicode", flagPassword, "秘密のパスワード", Settings{Password: "秘密のパスワード"}),
+		OptOk(t, "special", flagPassword, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{Password: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
 
-	// options = append(options, OptOk(t, "sender", flagSender, "sender@example.com", Settings{Sender: "sender@example.com"}))
+		OptOk(t, "email", flagSender, "sender@example.com", Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}}),
+		OptOk(t, "name", flagSender, "Sender<sender@example.com>", Settings{Sender: types.Email{Name: "Sender", Address: "sender@example.com"}}),
+		OptErr(t, "empty", flagSender, "", types.ErrEmailInvalid),
+		OptErr(t, "no at", flagSender, "sender", types.ErrEmailInvalid),
+		OptErr(t, "no domain", flagSender, "sender@", types.ErrEmailInvalid),
 
-	// options = append(options, OptOk(t, "reply-to", flagReplyTo, "replyto@example.com", Settings{ReplyTo: "replyto@example.com"}))
+		OptOk(t, "empty", flagReplyTo, "", Settings{}),
+		OptOk(t, "email", flagReplyTo, "replyto@example.com", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "replyto@example.com"}}}),
+		OptOk(t, "emails", flagReplyTo, "reply1@example.com, reply2@example.com", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "reply1@example.com"}, types.Email{Name: "", Address: "reply2@example.com"}}}),
+		OptOk(t, "name", flagReplyTo, "ReplyTo<replyto@example.com>", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "ReplyTo", Address: "replyto@example.com"}}}),
+		OptOk(t, "names", flagReplyTo, "Reply1<reply1@example.com>,Reply2<reply2@example.com>", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "Reply1", Address: "reply1@example.com"}, types.Email{Name: "Reply2", Address: "reply2@example.com"}}}),
+		OptErr(t, "no at", flagReplyTo, "replyto", types.ErrEmailInvalid),
+		OptErr(t, "no domain", flagReplyTo, "replyto@", types.ErrEmailInvalid),
+		OptErr(t, "partly", flagReplyTo, "reply1@example.com, reply2", types.ErrEmailInvalid),
 
-	// options = append(options, OptOk(t, "to", flagTo, "recipient@example.com", Settings{To: "recipient@example.com"}))
+		OptOk(t, "empty", flagTo, "", Settings{}),
+		OptOk(t, "names", flagTo, "To1<to1@example.com>,To2<to2@example.com>", Settings{RecipientsTo: types.EmailAddresses{types.Email{Name: "To1", Address: "to1@example.com"}, types.Email{Name: "To2", Address: "to2@example.com"}}}),
+		OptErr(t, "partly", flagTo, "to1@example.com, to2", types.ErrEmailInvalid),
 
-	// options = append(options, OptOk(t, "cc", flagCc, "cc@example.com", Settings{Cc: "cc@example.com"}))
+		OptOk(t, "empty", flagCc, "", Settings{}),
+		OptOk(t, "names", flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>", Settings{RecipientsCC: types.EmailAddresses{types.Email{Name: "Cc1", Address: "cc1@example.com"}, types.Email{Name: "Cc2", Address: "cc2@example.com"}}}),
+		OptErr(t, "partly", flagCc, "cc1@example.com, cc2", types.ErrEmailInvalid),
 
-	// options = append(options, OptOk(t, "bcc", flagBcc, "bcc@example.com", Settings{Bcc: "bcc@example.com"}))
+		OptOk(t, "empty", flagBcc, "", Settings{}),
+		OptOk(t, "names", flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>", Settings{RecipientsBCC: types.EmailAddresses{types.Email{Name: "Bcc1", Address: "bcc1@example.com"}, types.Email{Name: "Bcc2", Address: "bcc2@example.com"}}}),
+		OptErr(t, "partly", flagBcc, "bcc1@example.com, bcc2", types.ErrEmailInvalid),
 
-	// options = append(options, OptOk(t, "message-id", flagMessageId, "12345", Settings{MessageID: "12345"}))
+		OptOk(t, "empty", flagMessageId, "", Settings{}),
+		OptOk(t, "regular", flagMessageId, "ID-1234567890", Settings{MessageID: "ID-1234567890"}),
+		OptOk(t, "special", flagMessageId, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{MessageID: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
 
-	// options = append(options, OptOk(t, "subject", flagSubject, "Test Subject", Settings{Subject: "Test Subject"}))
+		OptOk(t, "empty", flagSubject, "", Settings{}),
+		OptOk(t, "regular", flagSubject, "Subject", Settings{Subject: "Subject"}),
+		OptOk(t, "unicode", flagSubject, "件名", Settings{Subject: "件名"}),
+		OptOk(t, "special", flagSubject, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{Subject: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
 
-	// options = append(options, OptOk(t, "header", flagHeader, "X-Custom-Header: value", Settings{Header: "X-Custom-Header: value"}))
+		// OptOk(t, "header", flagHeader, "X-Custom-Header: value", Settings{Header: "X-Custom-Header: value"}),
 
-	// options = append(options, OptOk(t, "body-text", flagBodyText, "This is a plain text body.", Settings{BodyText: "This is a plain text body."}))
+		// OptOk(t, "body-text", flagBodyText, "This is a plain text body.", Settings{BodyText: "This is a plain text body."}),
 
-	// options = append(options, OptOk(t, "body-html", flagBodyHtml, "<p>This is an HTML body.</p>", Settings{BodyHtml: "<p>This is an HTML body.</p>"}))
+		// OptOk(t, "body-html", flagBodyHtml, "<p>This is an HTML body.</p>", Settings{BodyHtml: "<p>This is an HTML body.</p>"}),
 
-	// options = append(options, OptOk(t, "attachment", flagAttachment, tmpExistingFile.Name(), Settings{Attachment: types.FilePath(tmpExistingFile.Name())}))
-	// options = append(options, OptErr(t, "non-existing attachment", flagAttachment, tmpNonExistingFile.Name(), "file "+tmpNonExistingFile.Name()+" does not exist (stat "+tmpNonExistingFile.Name()+": no such file or directory)"))
+		// OptOk(t, "attachment", flagAttachment, tmpExistingFile.Name(), Settings{Attachment: types.FilePath(tmpExistingFile.Name())}),
+		// OptErr(t, "non-existing attachment", flagAttachment, tmpNonExistingFile.Name(), "file "+tmpNonExistingFile.Name()+" does not exist (stat "+tmpNonExistingFile.Name()+": no such file or directory)"),
 
-	// options = append(options, OptOk(t, "help", flagHelp, "", Settings{Help: true}))
+		// OptOk(t, "help", flagHelp, "", Settings{Help: true}),
+
+	}
 
 	for _, opt := range options {
 		t.Run(opt.name, func(t *testing.T) {
 			os.Args = opt.arguments
 			settings, serverFilePath, authFilePath, err := getFlagsettings()
 
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			}
-			if errMsg != opt.expectedErrorMessage {
-				t.Errorf("Expected Error %s, got %s", opt.expectedErrorMessage, errMsg)
+			if opt.expectedError == nil {
+				if err != nil {
+					t.Errorf("Expected no error, got %s", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error %s, but got no error", opt.expectedError)
+				} else {
+					// if !errors.Is(err, opt.expectedError)  // Flag package does not wrap errors
+					if !strings.Contains(err.Error(), opt.expectedError.Error()) {
+						t.Errorf("Expected error %s, got %s", opt.expectedError, err.Error())
+					}
+				}
 			}
 
 			if !reflect.DeepEqual(settings, opt.expectedSettings) {
@@ -129,7 +170,7 @@ func OptOk(t testing.TB, name, flag, value string, settings Settings) option {
 		expectedSettings:       settings,
 		expectedServerFilePath: "",
 		expectedAuthFilePath:   "",
-		expectedErrorMessage:   "",
+		expectedError:          nil,
 	}
 	switch flag {
 	case flagServerFile:
@@ -140,7 +181,7 @@ func OptOk(t testing.TB, name, flag, value string, settings Settings) option {
 	return opt
 }
 
-func OptErr(t testing.TB, name, flag, value, errMsg string) option {
+func OptErr(t testing.TB, name, flag, value string, expErr error) option {
 	t.Helper()
 	return option{
 		name:                   "flag " + flag + " " + name,
@@ -148,6 +189,7 @@ func OptErr(t testing.TB, name, flag, value, errMsg string) option {
 		expectedSettings:       Settings{},
 		expectedServerFilePath: "",
 		expectedAuthFilePath:   "",
-		expectedErrorMessage:   "invalid value \"" + value + "\" for flag -" + flag + ": " + errMsg,
+		// expectedErrorMessage:   "invalid value \"" + value + "\" for flag -" + flag + ": " + errMsg,
+		expectedError: expErr,
 	}
 }
