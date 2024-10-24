@@ -47,8 +47,10 @@ func Test_getFlagsettings(t *testing.T) {
 	}
 
 	headerLength := "X-Length: "
-	headerIsMax := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)))
-	headerOverMax := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)+1))
+	headerMax := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)))
+	headerMaxPlus1 := fmt.Sprintf("%s%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)+1))
+	header2LinesMax := fmt.Sprintf("%s%s\r\n%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)), strings.Repeat("D", types.MaxLineLength))
+	header2LinesMaxPlus1 := fmt.Sprintf("%s%s\r\n%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)), strings.Repeat("D", types.MaxLineLength+1))
 
 	options := []option{
 		OptOk(t, "empty", flagSmtpHost, "", Settings{}),
@@ -129,8 +131,10 @@ func Test_getFlagsettings(t *testing.T) {
 		OptErr(t, "2 colons", flagHeader, "X-Test: X-Custom: testing", types.ErrHeaderMultipleColons),
 		OptErr(t, "illegal name", flagHeader, "X-試験: testing", types.ErrHeaderNameIllegalChars),
 		OptErr(t, "illegal body", flagHeader, "X-Test: 試験", types.ErrHeaderBodyIllegalChars),
-		OptOk(t, "length max", flagHeader, headerIsMax, Settings{Headers: types.Headers{types.Header(headerIsMax)}}),
-		OptErr(t, "length max+1", flagHeader, headerOverMax, types.ErrHeaderLineTooLong),
+		OptOk(t, "length max", flagHeader, headerMax, Settings{Headers: types.Headers{types.Header(headerMax)}}),
+		OptErr(t, "length max+1", flagHeader, headerMaxPlus1, types.ErrHeaderLineTooLong),
+		OptOk(t, "2 lines max", flagHeader, header2LinesMax, Settings{Headers: types.Headers{types.Header(header2LinesMax)}}),
+		OptErr(t, "2 lines max+1", flagHeader, header2LinesMaxPlus1, types.ErrHeaderLineTooLong),
 
 		// OptOk(t, "body-text", flagBodyText, "This is a plain text body.", Settings{BodyText: "This is a plain text body."}),
 
