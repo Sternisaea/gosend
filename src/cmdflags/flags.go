@@ -57,7 +57,7 @@ type Settings struct {
 	BodyHtml    string
 	Attachments types.Attachments
 
-	help bool
+	Help bool
 }
 
 func GetSettings(output io.Writer) (*Settings, error) {
@@ -66,8 +66,8 @@ func GetSettings(output io.Writer) (*Settings, error) {
 		return nil, err
 	}
 
-	if settings.help {
-		return nil, nil
+	if (*settings).Help {
+		return settings, nil
 	}
 
 	opts := make(map[string]string)
@@ -80,46 +80,58 @@ func GetSettings(output io.Writer) (*Settings, error) {
 		return nil, err
 	}
 
-	if settings.SmtpHost == "" {
-		if err := settings.SmtpHost.Set(opts[flagSmtpHost]); err != nil {
-			return nil, err
+	if (*settings).SmtpHost == "" {
+		if opts[flagSmtpHost] != "" {
+			if err := (*settings).SmtpHost.Set(opts[flagSmtpHost]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if settings.SmtpPort == 0 {
-		if err := settings.SmtpPort.Set(opts[flagSmtpPort]); err != nil {
-			return nil, err
+	if (*settings).SmtpPort == 0 {
+		if opts[flagSmtpPort] != "" {
+			if err := (*settings).SmtpPort.Set(opts[flagSmtpPort]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if settings.RootCA == "" {
-		if err := settings.RootCA.Set(opts[flagRootCA]); err != nil {
-			return nil, err
+	if (*settings).RootCA == "" {
+		if opts[flagRootCA] != "" {
+			if err := (*settings).RootCA.Set(opts[flagRootCA]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if settings.Security == types.NoSecurity {
-		if err := settings.Security.Set(opts[flagSecurity]); err != nil {
-			return nil, err
+	if (*settings).Security == types.NoSecurity {
+		if opts[flagSecurity] != "" {
+			if err := (*settings).Security.Set(opts[flagSecurity]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if settings.Authentication == types.NoAuthentication {
-		if err := settings.Authentication.Set(opts[flagAuthMethod]); err != nil {
-			return nil, err
+	if (*settings).Authentication == types.NoAuthentication {
+		if opts[flagAuthMethod] != "" {
+			if err := (*settings).Authentication.Set(opts[flagAuthMethod]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	if settings.Login == "" {
-		settings.Login = opts[flagLogin]
+	if (*settings).Login == "" {
+		(*settings).Login = opts[flagLogin]
 	}
-	if settings.Password == "" {
-		settings.Password = opts[flagPassword]
+	if (*settings).Password == "" {
+		(*settings).Password = opts[flagPassword]
 	}
-	if settings.Sender.Address == "" {
-		if err := settings.Sender.Set(opts[flagSender]); err != nil {
-			return nil, err
+	if (*settings).Sender.Address == "" {
+		if opts[flagSender] != "" {
+			if err := (*settings).Sender.Set(opts[flagSender]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return &settings, nil
+	return settings, nil
 }
 
-func getFlagsettings(output io.Writer) (Settings, types.FilePath, types.FilePath, error) {
+func getFlagsettings(output io.Writer) (*Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
 	var settings Settings
 
@@ -150,19 +162,19 @@ func getFlagsettings(output io.Writer) (Settings, types.FilePath, types.FilePath
 	fs.StringVar(&settings.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
 	fs.StringVar(&settings.BodyHtml, flagBodyHtml, "", "Body content in HTML.")
 	fs.Var(&settings.Attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
-	fs.BoolVar(&settings.help, flagHelp, false, "Show flag options.")
+	fs.BoolVar(&settings.Help, flagHelp, false, "Show flag options.")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
-		return Settings{}, "", "", err
+		return &Settings{}, "", "", err
 	}
 
-	if settings.help {
+	if settings.Help {
 		fs.SetOutput(output) // Enable text output
 		fs.PrintDefaults()   // Print flags usage
-		return settings, "", "", nil
+		return &settings, "", "", nil
 	}
-	return settings, serverFilePath, authFilePath, nil
+	return &settings, serverFilePath, authFilePath, nil
 }
 
 func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[string]string, error) {

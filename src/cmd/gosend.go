@@ -14,7 +14,7 @@ func main() {
 		log.Println(err)
 		os.Exit(2)
 	}
-	if st == nil {
+	if (*st).Help {
 		return
 	}
 
