@@ -18,9 +18,11 @@ var (
 )
 
 var (
+	ErrFileEmpty    = errors.New("no file name provided")
 	ErrFileNotExist = errors.New("file does not exist")
 	ErrFile         = errors.New("file error")
 
+	ErrDomainEmpty   = errors.New("no domain name provided")
 	ErrDomainInvalid = errors.New("invalid domain name")
 
 	ErrPortInvalid    = errors.New("invalid TCP port")
@@ -53,7 +55,7 @@ type FilePath string
 
 func (fp *FilePath) Set(path string) error {
 	if path == "" {
-		return nil
+		return ErrFileEmpty
 	}
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -72,6 +74,9 @@ func (fp FilePath) String() string {
 type DomainName string
 
 func (dn *DomainName) Set(host string) error {
+	if host == "" {
+		return fmt.Errorf("%w", ErrDomainEmpty)
+	}
 	d, err := idna.Lookup.ToASCII(host)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDomainInvalid, err)
@@ -286,13 +291,11 @@ type Attachments []FilePath
 func (at *Attachments) Set(attachments string) error {
 	for _, a := range strings.SplitN(attachments, ",", -1) {
 		attach := strings.TrimSpace(a)
-		if attach != "" {
-			var fp FilePath
-			if err := fp.Set(attach); err != nil {
-				return fmt.Errorf("%w: %w", ErrAttachmentInvalid, err)
-			}
-			*at = append(*at, fp)
+		var fp FilePath
+		if err := fp.Set(attach); err != nil {
+			return fmt.Errorf("%w: %w", ErrAttachmentInvalid, err)
 		}
+		*at = append(*at, fp)
 	}
 	return nil
 }
