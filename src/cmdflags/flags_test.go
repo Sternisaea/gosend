@@ -2,6 +2,7 @@ package cmdflags
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -136,21 +137,25 @@ func Test_getFlagsettings(t *testing.T) {
 		OptOk(t, "2 lines max", flagHeader, header2LinesMax, Settings{Headers: types.Headers{types.Header(header2LinesMax)}}),
 		OptErr(t, "2 lines max+1", flagHeader, header2LinesMaxPlus1, types.ErrHeaderLineTooLong),
 
-		// OptOk(t, "body-text", flagBodyText, "This is a plain text body.", Settings{BodyText: "This is a plain text body."}),
+		OptOk(t, "empty", flagBodyText, "", Settings{}),
+		OptOk(t, "text", flagBodyText, "This is a plain text \nbody.", Settings{BodyText: "This is a plain text \nbody."}),
 
-		// OptOk(t, "body-html", flagBodyHtml, "<p>This is an HTML body.</p>", Settings{BodyHtml: "<p>This is an HTML body.</p>"}),
+		OptOk(t, "empty", flagBodyHtml, "", Settings{}),
+		OptOk(t, "html", flagBodyHtml, "<p>This is an HTML body.</p>", Settings{BodyHtml: "<p>This is an HTML body.</p>"}),
 
-		// OptOk(t, "attachment", flagAttachment, tmpExistingFile.Name(), Settings{Attachment: types.FilePath(tmpExistingFile.Name())}),
-		// OptErr(t, "non-existing attachment", flagAttachment, tmpNonExistingFile.Name(), "file "+tmpNonExistingFile.Name()+" does not exist (stat "+tmpNonExistingFile.Name()+": no such file or directory)"),
+		OptOk(t, "1 file", flagAttachment, tmpExistingFile.Name(), Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFile.Name())}}),
+		OptOk(t, "2 file", flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFile.Name(), tmpExistingFile.Name()), Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFile.Name()), types.FilePath(tmpExistingFile.Name())}}),
 
-		// OptOk(t, "help", flagHelp, "", Settings{Help: true}),
+		OptErr(t, "fake-1", flagAttachment, tmpNonExistingFile.Name(), types.ErrAttachmentInvalid),
+		OptErr(t, "fake-2", flagAttachment, tmpNonExistingFile.Name(), types.ErrFileNotExist),
 
+		OptOk(t, "help", flagHelp, "", Settings{help: true}),
 	}
 
 	for _, opt := range options {
 		t.Run(opt.name, func(t *testing.T) {
 			os.Args = opt.arguments
-			settings, serverFilePath, authFilePath, err := getFlagsettings()
+			settings, serverFilePath, authFilePath, err := getFlagsettings(io.Discard)
 
 			if opt.expectedError == nil {
 				if err != nil {
@@ -161,7 +166,7 @@ func Test_getFlagsettings(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error %s, but got no error", opt.expectedError)
 				} else {
-					// if !errors.Is(err, opt.expectedError)  // Flag package does not wrap errors
+					// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
 					if !strings.Contains(err.Error(), opt.expectedError.Error()) {
 						t.Errorf("Expected error %s, got %s", opt.expectedError, err.Error())
 					}
