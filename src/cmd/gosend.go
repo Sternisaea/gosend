@@ -2,15 +2,17 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/Sternisaea/gosend/src/cmdflags"
 	"github.com/Sternisaea/gosend/src/send"
 )
 
 func main() {
-	st, err := cmdflags.GetSettings()
+	st, err := cmdflags.GetSettings(os.Stdout)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		os.Exit(2)
 	}
 	if st == nil {
 		return

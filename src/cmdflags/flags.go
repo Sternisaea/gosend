@@ -60,11 +60,10 @@ type Settings struct {
 	help bool
 }
 
-func GetSettings() (*Settings, error) {
-	settings, serverFilePath, authFilePath, err := getFlagsettings()
+func GetSettings(output io.Writer) (*Settings, error) {
+	settings, serverFilePath, authFilePath, err := getFlagsettings(output)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(2)
+		return nil, err
 	}
 
 	if settings.help {
@@ -120,7 +119,7 @@ func GetSettings() (*Settings, error) {
 	return &settings, nil
 }
 
-func getFlagsettings() (Settings, types.FilePath, types.FilePath, error) {
+func getFlagsettings(output io.Writer) (Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
 	var settings Settings
 
@@ -159,8 +158,8 @@ func getFlagsettings() (Settings, types.FilePath, types.FilePath, error) {
 	}
 
 	if settings.help {
-		fs.SetOutput(os.Stdout) // Enable text output
-		fs.PrintDefaults()      // Print flags usage
+		fs.SetOutput(output) // Enable text output
+		fs.PrintDefaults()   // Print flags usage
 		return settings, "", "", nil
 	}
 	return settings, serverFilePath, authFilePath, nil
