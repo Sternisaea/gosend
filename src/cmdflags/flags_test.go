@@ -54,9 +54,9 @@ func Test_getFlagsettings(t *testing.T) {
 	header2LinesMaxPlus1 := fmt.Sprintf("%s%s\r\n%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)), strings.Repeat("D", types.MaxLineLength+1))
 
 	options := []option{
-		OptOk(t, "empty", flagSmtpHost, "", Settings{}),
 		OptOk(t, "normal", flagSmtpHost, "domain.com", Settings{SmtpHost: "domain.com"}),
 		OptOk(t, "non-tld", flagSmtpHost, "domain", Settings{SmtpHost: "domain"}),
+		OptErr(t, "empty", flagSmtpHost, "", types.ErrDomainEmpty),
 		OptErr(t, "directory", flagSmtpHost, "domain.com/dir", types.ErrDomainInvalid),
 		OptErr(t, "double quoted", flagSmtpHost, `"domain.com"`, types.ErrDomainInvalid),
 
@@ -66,6 +66,7 @@ func Test_getFlagsettings(t *testing.T) {
 		OptErr(t, "empty", flagSmtpPort, "", types.ErrPortInvalid),
 
 		OptOk(t, "existing", flagRootCA, tmpExistingFile.Name(), Settings{RootCA: types.FilePath(tmpExistingFile.Name())}),
+		OptErr(t, "empty", flagRootCA, "", types.ErrFileEmpty),
 		OptErr(t, "non-existing", flagRootCA, tmpNonExistingFile.Name(), types.ErrFileNotExist),
 
 		OptOk(t, "none", flagSecurity, string(types.NoSecurity), Settings{Security: types.NoSecurity}),
@@ -145,47 +146,40 @@ func Test_getFlagsettings(t *testing.T) {
 
 		OptOk(t, "1 file", flagAttachment, tmpExistingFile.Name(), Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFile.Name())}}),
 		OptOk(t, "2 file", flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFile.Name(), tmpExistingFile.Name()), Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFile.Name()), types.FilePath(tmpExistingFile.Name())}}),
-
+		OptErr(t, "empty", flagAttachment, "", types.ErrFileEmpty),
 		OptErr(t, "fake-1", flagAttachment, tmpNonExistingFile.Name(), types.ErrAttachmentInvalid),
 		OptErr(t, "fake-2", flagAttachment, tmpNonExistingFile.Name(), types.ErrFileNotExist),
 
-		OptOk(t, "help", flagHelp, "", Settings{help: true}),
+		OptOk(t, "help", flagHelp, "", Settings{Help: true}),
 	}
 
 	for _, opt := range options {
 		t.Run(opt.name, func(t *testing.T) {
 			os.Args = opt.arguments
-			settings, serverFilePath, authFilePath, err := getFlagsettings(io.Discard)
+			settings, err := GetSettings(io.Discard)
 
 			if opt.expectedError == nil {
 				if err != nil {
-					t.Errorf("Expected no error, got %s", err)
-					return
+					t.Fatalf("Expected no error, got %s", err)
 				}
 			} else {
 				if err == nil {
-					t.Errorf("Expected error %s, but got no error", opt.expectedError)
+					t.Fatalf("Expected error %s, but got no error", opt.expectedError)
 				} else {
 					// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
-					if !strings.Contains(err.Error(), opt.expectedError.Error()) {
-						t.Errorf("Expected error %s, got %s", opt.expectedError, err.Error())
+					if strings.Contains(err.Error(), opt.expectedError.Error()) {
+						return // Expected error
+					} else {
+						t.Fatalf("Expected error %s, got %s", opt.expectedError, err.Error())
 					}
 				}
-				return
 			}
 
-			if !reflect.DeepEqual(settings, opt.expectedSettings) {
+			if !reflect.DeepEqual(*settings, opt.expectedSettings) {
 				t.Errorf("Expected %v, got %v", opt.expectedSettings, settings)
-			}
-			if serverFilePath != opt.expectedServerFilePath {
-				t.Errorf("Expected %s, got %s", opt.expectedServerFilePath, serverFilePath)
-			}
-			if authFilePath != opt.expectedAuthFilePath {
-				t.Errorf("Expected %s, got %s", opt.expectedAuthFilePath, authFilePath)
 			}
 		})
 	}
-
 }
 
 func OptOk(t testing.TB, name, flag, value string, settings Settings) option {
