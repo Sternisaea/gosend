@@ -196,7 +196,7 @@ func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[s
 			continue
 		}
 		key := strings.ToLower(strings.TrimSpace(line[:equalIndex]))
-		value := strings.TrimSpace(strings.Trim(line[equalIndex+1:], "\""))
+		value := strings.Trim(strings.TrimSpace(line[equalIndex+1:]), "\"")
 		opts[key] = value
 	}
 	if err := scanner.Err(); err != nil {
