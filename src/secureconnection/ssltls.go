@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 type ConnectSslTls struct {
@@ -29,6 +31,10 @@ func (c *ConnectSslTls) Check() error {
 		errMsgs = append(errMsgs, checkPath((*c).rootCaPath))
 	}
 	return errors.Join(errMsgs...)
+}
+
+func (c *ConnectSslTls) GetType() types.Security {
+	return types.SslTlsSec
 }
 
 func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 type ConnectNone struct {
@@ -24,6 +26,10 @@ func (c *ConnectNone) Check() error {
 		errMsgs = append(errMsgs, fmt.Errorf("no tcp-port provided"))
 	}
 	return errors.Join(errMsgs...)
+}
+
+func (c *ConnectNone) GetType() types.Security {
+	return types.NoSecurity
 }
 
 func (c *ConnectNone) ClientConnect() (*smtp.Client, func() error, error) {

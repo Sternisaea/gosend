@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 const StartTls = "starttls"
@@ -31,6 +33,10 @@ func (c *ConnectStarttls) Check() error {
 		errMsgs = append(errMsgs, checkPath((*c).rootCaPath))
 	}
 	return errors.Join(errMsgs...)
+}
+
+func (c *ConnectStarttls) GetType() types.Security {
+	return types.StartTlsSec
 }
 
 func (c *ConnectStarttls) ClientConnect() (*smtp.Client, func() error, error) {
