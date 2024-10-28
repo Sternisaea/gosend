@@ -17,6 +17,7 @@ var (
 	ErrFailedAppendCertificate = errors.New("failed to append PEM certificate")
 	ErrStarttlsNotSupported    = errors.New("server does not support STARTTLS")
 	ErrSslTlsNotSupported      = errors.New("server does not support SSL/TLS")
+	ErrUnknownProtocol         = errors.New("unkown security protocol")
 )
 
 type SecureConnection interface {
@@ -35,6 +36,6 @@ func GetSecureConnection(st *cmdflags.Settings) (SecureConnection, error) {
 	case types.SslTlsSec:
 		return NewConnectSslTls(st.SmtpHost.String(), int(st.SmtpPort), st.RootCA.String()), nil
 	default:
-		return nil, fmt.Errorf("unkown security protocol: %s", st.Security)
+		return nil, fmt.Errorf("%w : %s", ErrUnknownProtocol, st.Security)
 	}
 }
