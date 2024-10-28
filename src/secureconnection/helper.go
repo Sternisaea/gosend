@@ -13,9 +13,9 @@ func checkPath(p string) error {
 	}
 	if _, err := os.Stat(p); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("file %s does not exist (%s)", p, err)
+			return fmt.Errorf("%w %w", ErrFileDoesNotExist, err)
 		}
-		return fmt.Errorf("error file %s (%s)", p, err)
+		return fmt.Errorf("%w %w", ErrFile, err)
 	}
 	return nil
 }
@@ -27,7 +27,7 @@ func getPemCertificate(path string) (*x509.CertPool, error) {
 	}
 	rootCAs := x509.NewCertPool()
 	if ok := rootCAs.AppendCertsFromPEM(cert); !ok {
-		return nil, fmt.Errorf("failed to append PEM certificate %s", path)
+		return nil, fmt.Errorf("%w : %s", ErrFailedAppendCertificate, path)
 	}
 	return rootCAs, nil
 }
