@@ -77,12 +77,10 @@
 With the flags `-server-file` and `-auth-file` you can point to a settings file which contains the desired settings for the server and authentication.
 
 Supported flags are:
-- `server-file`
 - `smtp-host`
 - `smtp-port`
 - `rootca`
 - `security`
-- `auth-file`
 - `auth-method`
 - `login`
 - `password`
