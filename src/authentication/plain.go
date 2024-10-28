@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 type AuthPlain struct {
@@ -28,6 +30,10 @@ func (a *AuthPlain) Check() error {
 		errMsgs = append(errMsgs, fmt.Errorf("no password provided"))
 	}
 	return errors.Join(errMsgs...)
+}
+
+func (a *AuthPlain) GetType() types.AuthenticationMethod {
+	return types.PlainAuth
 }
 
 func (a *AuthPlain) Authenticate(client *smtp.Client) error {

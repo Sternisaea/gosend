@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
 )
 
 type AuthCramMd5 struct {
@@ -24,6 +26,10 @@ func (a *AuthCramMd5) Check() error {
 		errMsgs = append(errMsgs, fmt.Errorf("no password provided"))
 	}
 	return errors.Join(errMsgs...)
+}
+
+func (a *AuthCramMd5) GetType() types.AuthenticationMethod {
+	return types.CramMd5Auth
 }
 
 func (a *AuthCramMd5) Authenticate(client *smtp.Client) error {

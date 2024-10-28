@@ -1,6 +1,10 @@
 package authentication
 
-import "net/smtp"
+import (
+	"net/smtp"
+
+	"github.com/Sternisaea/gosend/src/types"
+)
 
 type AuthNone struct {
 }
@@ -11,6 +15,10 @@ func NewAuthNone() *AuthNone {
 
 func (a *AuthNone) Check() error {
 	return nil
+}
+
+func (a *AuthNone) GetType() types.AuthenticationMethod {
+	return types.NoAuthentication
 }
 
 func (a *AuthNone) Authenticate(client *smtp.Client) error {
