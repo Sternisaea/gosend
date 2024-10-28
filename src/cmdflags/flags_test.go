@@ -33,7 +33,7 @@ const (
 	SpacesAndQuotes
 )
 
-func Test_getFlagsettings(t *testing.T) {
+func Test_GetSettings(t *testing.T) {
 
 	tmpExistingFileName, err := createSettingsFile("exist", []option{}, NoSpacesAndNoQuotes)
 	if err != nil {
