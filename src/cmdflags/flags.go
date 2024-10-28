@@ -61,7 +61,7 @@ type Settings struct {
 }
 
 func GetSettings(output io.Writer) (*Settings, error) {
-	settings, serverFilePath, authFilePath, err := getFlagsettings(output)
+	settings, serverFilePath, authFilePath, err := getFlagSettings(output)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func GetSettings(output io.Writer) (*Settings, error) {
 	return settings, nil
 }
 
-func getFlagsettings(output io.Writer) (*Settings, types.FilePath, types.FilePath, error) {
+func getFlagSettings(output io.Writer) (*Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
 	var settings Settings
 
