@@ -4,7 +4,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/Sternisaea/gosend/src/authentication"
 	"github.com/Sternisaea/gosend/src/cmdflags"
+	"github.com/Sternisaea/gosend/src/secureconnection"
 	"github.com/Sternisaea/gosend/src/send"
 )
 
@@ -18,26 +20,20 @@ func main() {
 		return
 	}
 
-	conn, err := getSecureConnection(st)
+	conn, err := secureconnection.GetSecureConnection(st)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	auth, err := getAuthentication(st)
+	auth, err := authentication.GetAuthentication(st)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	msg, err := getMessage(st)
-	if err != nil {
+	send := send.NewSmtpSend(conn, auth)
+	if err := send.CreateMessage(st); err != nil {
 		log.Fatal(err)
 	}
-
-	if err := checkSettings(st, conn, auth, msg); err != nil {
-		log.Fatal(err)
-	}
-
-	send := send.NewSmtpSend(conn, auth, msg)
 	if err := send.SendMail(); err != nil {
 		log.Fatal(err)
 	}
