@@ -12,6 +12,7 @@ type SecureConnection interface {
 	Check() error
 	ClientConnect() (*smtp.Client, func() error, error)
 	GetType() types.Security
+	GetHostName() string
 }
 
 func GetSecureConnection(st *cmdflags.Settings) (SecureConnection, error) {

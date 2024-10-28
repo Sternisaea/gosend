@@ -32,6 +32,10 @@ func (c *ConnectNone) GetType() types.Security {
 	return types.NoSecurity
 }
 
+func (c *ConnectNone) GetHostName() string {
+	return (*c).hostname
+}
+
 func (c *ConnectNone) ClientConnect() (*smtp.Client, func() error, error) {
 	if err := c.Check(); err != nil {
 		return nil, nil, err

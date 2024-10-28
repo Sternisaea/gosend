@@ -37,6 +37,10 @@ func (c *ConnectSslTls) GetType() types.Security {
 	return types.SslTlsSec
 }
 
+func (c *ConnectSslTls) GetHostName() string {
+	return (*c).hostname
+}
+
 func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {
 	if err := c.Check(); err != nil {
 		return nil, nil, err
