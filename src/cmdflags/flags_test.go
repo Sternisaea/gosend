@@ -41,6 +41,12 @@ func Test_getFlagsettings(t *testing.T) {
 	}
 	defer os.Remove(tmpExistingFileName)
 
+	tmpExistingFileName2, err := createSettingsFile("exist", []option{}, NoSpacesAndNoQuotes)
+	if err != nil {
+		t.Errorf("Cannot create file %s", err)
+	}
+	defer os.Remove(tmpExistingFileName2)
+
 	tmpNonExistingFileName, err := createSettingsFile("exist", []option{}, NoSpacesAndNoQuotes)
 	if err != nil {
 		t.Errorf("Cannot create file %s", err)
@@ -148,14 +154,72 @@ func Test_getFlagsettings(t *testing.T) {
 	addCheckOk(t, &checklist, "flag "+flagBodyHtml+" html", []option{{flagBodyHtml, "<p>This is an HTML body.</p>"}}, &Settings{BodyHtml: "<p>This is an HTML body.</p>"})
 
 	addCheckOk(t, &checklist, "flag "+flagAttachment+" 1 file", []option{{flagAttachment, tmpExistingFileName}}, &Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName)}})
-	addCheckOk(t, &checklist, "flag "+flagAttachment+" 2 files", []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName)}}, &Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName), types.FilePath(tmpExistingFileName)}})
-	addCheckErr(t, &checklist, "flag "+flagAttachment+" empty", []option{{flagAttachment, ""}}, &[]error{types.ErrFileEmpty})
-	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake-1", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrAttachmentInvalid})
-	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake-2", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrFileNotExist})
+	addCheckOk(t, &checklist, "flag "+flagAttachment+" 2 files", []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName2)}}, &Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName), types.FilePath(tmpExistingFileName2)}})
+	addCheckErr(t, &checklist, "flag "+flagAttachment+" empty", []option{{flagAttachment, ""}}, &[]error{types.ErrAttachmentInvalid, types.ErrFileEmpty})
+	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrAttachmentInvalid, types.ErrFileNotExist})
 
 	addCheckOk(t, &checklist, "flag "+flagHelp+" help", []option{{flagHelp, ""}}, &Settings{Help: true})
 
 	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" normal", flagServerFile, []option{{flagSmtpHost, "domain.com"}}, []option{}, &Settings{SmtpHost: "domain.com"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" non-tld", flagServerFile, []option{{flagSmtpHost, "domain"}}, []option{}, &Settings{SmtpHost: "domain"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" empty", flagServerFile, []option{{flagSmtpHost, ""}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" double quoted", flagServerFile, []option{{flagSmtpHost, `"domain.com"`}}, []option{}, &Settings{SmtpHost: "domain.com"})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSmtpHost+" directory", flagServerFile, []option{{flagSmtpHost, "domain.com/dir"}}, []option{}, &[]error{types.ErrDomainInvalid})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" overrule", flagServerFile, []option{{flagSmtpHost, "notthis.com"}}, []option{{flagSmtpHost, "domain.com"}}, &Settings{SmtpHost: "domain.com"})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpPort+" regular", flagServerFile, []option{{flagSmtpPort, "587"}}, []option{}, &Settings{SmtpPort: 587})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpPort+" empty", flagServerFile, []option{{flagSmtpPort, ""}}, []option{}, &Settings{})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSmtpPort+" negative", flagServerFile, []option{{flagSmtpPort, "-1"}}, []option{}, &[]error{types.ErrPortNegative})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSmtpPort+" out of range", flagServerFile, []option{{flagSmtpPort, "65536"}}, []option{}, &[]error{types.ErrPortOutOfRange})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpPort+" overrule", flagServerFile, []option{{flagSmtpPort, "999"}}, []option{{flagSmtpPort, "587"}}, &Settings{SmtpPort: 587})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagRootCA+" existing", flagServerFile, []option{{flagRootCA, tmpExistingFileName}}, []option{}, &Settings{RootCA: types.FilePath(tmpExistingFileName)})
+	addSettingsCheckOk(t, &checklist, "setting "+flagRootCA+" empty", flagServerFile, []option{{flagRootCA, ""}}, []option{}, &Settings{})
+	addSettingsCheckErr(t, &checklist, "setting "+flagRootCA+" non-existing", flagServerFile, []option{{flagRootCA, tmpNonExistingFileName}}, []option{}, &[]error{types.ErrFileNotExist})
+	addSettingsCheckOk(t, &checklist, "setting "+flagRootCA+" overrule", flagServerFile, []option{{flagRootCA, tmpExistingFileName2}}, []option{{flagRootCA, tmpExistingFileName}}, &Settings{RootCA: types.FilePath(tmpExistingFileName)})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagSecurity+" none", flagServerFile, []option{{flagSecurity, string(types.NoSecurity)}}, []option{}, &Settings{Security: types.NoSecurity})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSecurity+" StartTLS", flagServerFile, []option{{flagSecurity, string(types.StartTlsSec)}}, []option{}, &Settings{Security: types.StartTlsSec})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSecurity+" SSLTLS", flagServerFile, []option{{flagSecurity, string(types.SslTlsSec)}}, []option{}, &Settings{Security: types.SslTlsSec})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSecurity+" invalid", flagServerFile, []option{{flagSecurity, "INVALID"}}, []option{}, &[]error{types.ErrSecurityInvalid})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSecurity+" overrule", flagServerFile, []option{{flagSecurity, string(types.SslTlsSec)}}, []option{{flagSecurity, string(types.StartTlsSec)}}, &Settings{Security: types.StartTlsSec})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagAuthMethod+" none", flagServerFile, []option{{flagAuthMethod, string(types.NoAuthentication)}}, []option{}, &Settings{Authentication: types.NoAuthentication})
+	addSettingsCheckOk(t, &checklist, "setting "+flagAuthMethod+" plain", flagServerFile, []option{{flagAuthMethod, string(types.PlainAuth)}}, []option{}, &Settings{Authentication: types.PlainAuth})
+	addSettingsCheckOk(t, &checklist, "setting "+flagAuthMethod+" crammd5", flagServerFile, []option{{flagAuthMethod, string(types.CramMd5Auth)}}, []option{}, &Settings{Authentication: types.CramMd5Auth})
+	addSettingsCheckErr(t, &checklist, "setting "+flagAuthMethod+" invalid", flagServerFile, []option{{flagAuthMethod, "INVALID"}}, []option{}, &[]error{types.ErrAuthenticationInvalid})
+	addSettingsCheckOk(t, &checklist, "setting "+flagAuthMethod+" plain", flagServerFile, []option{{flagAuthMethod, string(types.CramMd5Auth)}}, []option{{flagAuthMethod, string(types.PlainAuth)}}, &Settings{Authentication: types.PlainAuth})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagLogin+" empty", flagServerFile, []option{{flagLogin, ""}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "setting "+flagLogin+" regular", flagServerFile, []option{{flagLogin, "My Name"}}, []option{}, &Settings{Login: "My Name"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagLogin+" unicode", flagServerFile, []option{{flagLogin, "私の名前"}}, []option{}, &Settings{Login: "私の名前"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagLogin+" email", flagServerFile, []option{{flagLogin, "user@example.com"}}, []option{}, &Settings{Login: "user@example.com"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagLogin+" overrule", flagServerFile, []option{{flagLogin, "Not shown Name"}}, []option{{flagLogin, "My Name"}}, &Settings{Login: "My Name"})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagPassword+" empty", flagServerFile, []option{{flagPassword, ""}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "setting "+flagPassword+" regular", flagServerFile, []option{{flagPassword, "MySecret"}}, []option{}, &Settings{Password: "MySecret"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagPassword+" unicode", flagServerFile, []option{{flagPassword, "秘密のパスワード"}}, []option{}, &Settings{Password: "秘密のパスワード"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagPassword+" special", flagServerFile, []option{{flagPassword, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}}, []option{}, &Settings{Password: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"})
+	addSettingsCheckOk(t, &checklist, "setting "+flagPassword+" overrule", flagServerFile, []option{{flagPassword, "NotShownSecret"}}, []option{{flagPassword, "MySecret"}}, &Settings{Password: "MySecret"})
+
+	addSettingsCheckOk(t, &checklist, "setting "+flagSender+" email", flagServerFile, []option{{flagSender, "sender@example.com"}}, []option{}, &Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSender+" name", flagServerFile, []option{{flagSender, "Sender<sender@example.com>"}}, []option{}, &Settings{Sender: types.Email{Name: "Sender", Address: "sender@example.com"}})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSender+" empty", flagServerFile, []option{{flagSender, ""}}, []option{}, &Settings{})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSender+" no at", flagServerFile, []option{{flagSender, "sender"}}, []option{}, &[]error{types.ErrEmailInvalid})
+	addSettingsCheckErr(t, &checklist, "setting "+flagSender+" no domain", flagServerFile, []option{{flagSender, "sender@"}}, []option{}, &[]error{types.ErrEmailInvalid})
+	addSettingsCheckOk(t, &checklist, "setting "+flagSender+" overrule", flagServerFile, []option{{flagSender, "Sender<sender@example.com>"}}, []option{{flagSender, "sender@example.com"}}, &Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}})
+
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagReplyTo, flagServerFile, []option{{flagReplyTo, "replyto@example.com"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagTo, flagServerFile, []option{{flagTo, "To1<to1@example.com>,To2<to2@example.com>"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagCc, flagServerFile, []option{{flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBcc, flagServerFile, []option{{flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagMessageId, flagServerFile, []option{{flagMessageId, "ID-1234567890"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagSubject, flagServerFile, []option{{flagSubject, "Subject"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagHeader, flagServerFile, []option{{flagHeader, "X-Test: testing"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBodyText, flagServerFile, []option{{flagBodyText, "This is a plain text \nbody."}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBodyHtml, flagServerFile, []option{{flagBodyHtml, "<p>This is an HTML body.</p>"}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagAttachment, flagServerFile, []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName2)}}, []option{}, &Settings{})
+	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagHelp, flagServerFile, []option{{flagHelp, ""}}, []option{}, &Settings{})
 
 	for _, opt := range checklist {
 		t.Run(opt.name, func(t *testing.T) {
@@ -182,7 +246,7 @@ func Test_getFlagsettings(t *testing.T) {
 					for _, e := range *opt.expectedErrors {
 						// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
 						if !strings.Contains(err.Error(), e.Error()) {
-							t.Fatalf("Expected error %s, got %s", e, err.Error())
+							t.Errorf("Expected error %s, got %s", e, err.Error())
 						}
 					}
 					return
@@ -198,12 +262,12 @@ func Test_getFlagsettings(t *testing.T) {
 
 func addCheckOk(t testing.TB, checklist *[]check, name string, options []option, settings *Settings) {
 	t.Helper()
-	addCheck(checklist, name, options, settings, nil)
+	addCheck(checklist, name, options, settings, nil, "")
 }
 
 func addCheckErr(t testing.TB, checklist *[]check, name string, options []option, expectedErrors *[]error) {
 	t.Helper()
-	addCheck(checklist, name, options, nil, expectedErrors)
+	addCheck(checklist, name, options, nil, expectedErrors, "")
 }
 
 func addSettingsCheckOk(t testing.TB, checklist *[]check, name, settingsFlag string, settingsOptions []option, flagOptions []option, settings *Settings) {
@@ -221,17 +285,16 @@ func addSettingsCheckErr(t testing.TB, checklist *[]check, name, settingsFlag st
 }
 
 func addSettingsCheck(checklist *[]check, name, settingsFlag string, settingsOptions []option, flagOptions []option, settings *Settings, expectedErrors *[]error) error {
-
 	for sf := settingsFormat(0); sf < settingsFormat(4); sf++ {
 		namepart := name
 		switch sf {
 		case NoSpacesAndNoQuotes:
 		case NoSpacesAndQuotes:
-			namepart += "_Q"
+			namepart += " Q"
 		case SpacesAndNoQuotes:
-			namepart += "_SP"
+			namepart += " SP"
 		case SpacesAndQuotes:
-			namepart += "_SP_Q"
+			namepart += " SP Q"
 		}
 
 		fileName, err := createSettingsFile(namepart, settingsOptions, sf)
@@ -239,18 +302,20 @@ func addSettingsCheck(checklist *[]check, name, settingsFlag string, settingsOpt
 			return err
 		}
 
-		flagOptions = append(flagOptions, option{settingsFlag, fileName})
-		addCheck(checklist, namepart, flagOptions, settings, expectedErrors)
+		flags := flagOptions
+		flags = append(flags, option{settingsFlag, fileName})
+		addCheck(checklist, namepart, flags, settings, expectedErrors, fileName)
 	}
 	return nil
 }
 
-func addCheck(checklist *[]check, name string, options []option, settings *Settings, expectedErrors *[]error) {
+func addCheck(checklist *[]check, name string, options []option, settings *Settings, expectedErrors *[]error, fileName string) {
 	*checklist = append(*checklist, check{
 		name:             name,
 		arguments:        getArguments(options),
 		expectedSettings: settings,
 		expectedErrors:   expectedErrors,
+		fileName:         fileName,
 	})
 }
 
@@ -264,7 +329,7 @@ func getArguments(options []option) []string {
 }
 
 func createSettingsFile(name string, options []option, format settingsFormat) (string, error) {
-	tmpFile, err := os.CreateTemp(os.TempDir(), name)
+	tmpFile, err := os.CreateTemp(os.TempDir(), strings.ReplaceAll(name, " ", "_"))
 	if err != nil {
 		return "", err
 	}
