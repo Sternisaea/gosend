@@ -84,6 +84,7 @@ Supported flags are:
 - `auth-method`
 - `login`
 - `password`
+- `sender`
 
 ### Notes
 
