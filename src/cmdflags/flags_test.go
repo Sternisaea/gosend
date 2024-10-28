@@ -1,6 +1,7 @@
 package cmdflags
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,23 +12,36 @@ import (
 	"github.com/Sternisaea/gosend/src/types"
 )
 
-type option struct {
+type check struct {
 	name             string
 	arguments        []string
-	expectedSettings Settings
-	expectedError    error
+	expectedSettings *Settings
+	expectedErrors   *[]error
 	fileName         string
 }
 
+type option struct {
+	name, value string
+}
+
+type settingsFormat int
+
+const (
+	NoSpacesAndNoQuotes settingsFormat = iota
+	NoSpacesAndQuotes
+	SpacesAndNoQuotes
+	SpacesAndQuotes
+)
+
 func Test_getFlagsettings(t *testing.T) {
 
-	tmpExistingFileName, err := createSettingsFile("exist", "", "", false, false)
+	tmpExistingFileName, err := createSettingsFile("exist", []option{}, NoSpacesAndNoQuotes)
 	if err != nil {
 		t.Errorf("Cannot create file %s", err)
 	}
 	defer os.Remove(tmpExistingFileName)
 
-	tmpNonExistingFileName, err := createSettingsFile("exist", "", "", false, false)
+	tmpNonExistingFileName, err := createSettingsFile("exist", []option{}, NoSpacesAndNoQuotes)
 	if err != nil {
 		t.Errorf("Cannot create file %s", err)
 	} else {
@@ -42,112 +56,108 @@ func Test_getFlagsettings(t *testing.T) {
 	header2LinesMax := fmt.Sprintf("%s%s\r\n%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)), strings.Repeat("D", types.MaxLineLength))
 	header2LinesMaxPlus1 := fmt.Sprintf("%s%s\r\n%s", headerLength, strings.Repeat("H", types.MaxLineLength-len(headerLength)), strings.Repeat("D", types.MaxLineLength+1))
 
-	options := &[]option{
-		optOk(t, "normal", flagSmtpHost, "domain.com", Settings{SmtpHost: "domain.com"}),
-		optOk(t, "non-tld", flagSmtpHost, "domain", Settings{SmtpHost: "domain"}),
-		optErr(t, "empty", flagSmtpHost, "", types.ErrDomainEmpty),
-		optErr(t, "directory", flagSmtpHost, "domain.com/dir", types.ErrDomainInvalid),
-		optErr(t, "double quoted", flagSmtpHost, `"domain.com"`, types.ErrDomainInvalid),
+	checklist := make([]check, 0, 100)
+	addCheckOk(t, &checklist, "flag "+flagSmtpHost+" normal", []option{{flagSmtpHost, "domain.com"}}, &Settings{SmtpHost: "domain.com"})
+	addCheckOk(t, &checklist, "flag "+flagSmtpHost+" non-tld", []option{{flagSmtpHost, "domain"}}, &Settings{SmtpHost: "domain"})
+	addCheckErr(t, &checklist, "flag "+flagSmtpHost+" empty", []option{{flagSmtpHost, ""}}, &[]error{types.ErrDomainEmpty})
+	addCheckErr(t, &checklist, "flag "+flagSmtpHost+" directory", []option{{flagSmtpHost, "domain.com/dir"}}, &[]error{types.ErrDomainInvalid})
+	addCheckErr(t, &checklist, "flag "+flagSmtpHost+" double quoted", []option{{flagSmtpHost, `"domain.com"`}}, &[]error{types.ErrDomainInvalid})
 
-		optOk(t, "regular", flagSmtpPort, "587", Settings{SmtpPort: 587}),
-		optErr(t, "negative", flagSmtpPort, "-1", types.ErrPortNegative),
-		optErr(t, "out of range", flagSmtpPort, "65536", types.ErrPortOutOfRange),
-		optErr(t, "empty", flagSmtpPort, "", types.ErrPortInvalid),
+	addCheckOk(t, &checklist, "flag "+flagSmtpPort+" regular", []option{{flagSmtpPort, "587"}}, &Settings{SmtpPort: 587})
+	addCheckErr(t, &checklist, "flag "+flagSmtpPort+" negative", []option{{flagSmtpPort, "-1"}}, &[]error{types.ErrPortNegative})
+	addCheckErr(t, &checklist, "flag "+flagSmtpPort+" out of range", []option{{flagSmtpPort, "65536"}}, &[]error{types.ErrPortOutOfRange})
+	addCheckErr(t, &checklist, "flag "+flagSmtpPort+" empty", []option{{flagSmtpPort, ""}}, &[]error{types.ErrPortInvalid})
 
-		optOk(t, "existing", flagRootCA, tmpExistingFileName, Settings{RootCA: types.FilePath(tmpExistingFileName)}),
-		optErr(t, "empty", flagRootCA, "", types.ErrFileEmpty),
-		optErr(t, "non-existing", flagRootCA, tmpNonExistingFileName, types.ErrFileNotExist),
+	addCheckOk(t, &checklist, "flag "+flagRootCA+" existing", []option{{flagRootCA, tmpExistingFileName}}, &Settings{RootCA: types.FilePath(tmpExistingFileName)})
+	addCheckErr(t, &checklist, "flag "+flagRootCA+" empty", []option{{flagRootCA, ""}}, &[]error{types.ErrFileEmpty})
+	addCheckErr(t, &checklist, "flag "+flagRootCA+" non-existing", []option{{flagRootCA, tmpNonExistingFileName}}, &[]error{types.ErrFileNotExist})
 
-		optOk(t, "none", flagSecurity, string(types.NoSecurity), Settings{Security: types.NoSecurity}),
-		optOk(t, "StartTLS", flagSecurity, string(types.StartTlsSec), Settings{Security: types.StartTlsSec}),
-		optOk(t, "SSLTLS", flagSecurity, string(types.SslTlsSec), Settings{Security: types.SslTlsSec}),
-		optErr(t, "invalid", flagSecurity, "INVALID", types.ErrSecurityInvalid),
+	addCheckOk(t, &checklist, "flag "+flagSecurity+" none", []option{{flagSecurity, string(types.NoSecurity)}}, &Settings{Security: types.NoSecurity})
+	addCheckOk(t, &checklist, "flag "+flagSecurity+" StartTLS", []option{{flagSecurity, string(types.StartTlsSec)}}, &Settings{Security: types.StartTlsSec})
+	addCheckOk(t, &checklist, "flag "+flagSecurity+" SSLTLS", []option{{flagSecurity, string(types.SslTlsSec)}}, &Settings{Security: types.SslTlsSec})
+	addCheckErr(t, &checklist, "flag "+flagSecurity+" invalid", []option{{flagSecurity, "INVALID"}}, &[]error{types.ErrSecurityInvalid})
 
-		optOk(t, "none", flagAuthMethod, string(types.NoAuthentication), Settings{Authentication: types.NoAuthentication}),
-		optOk(t, "plain", flagAuthMethod, string(types.PlainAuth), Settings{Authentication: types.PlainAuth}),
-		optOk(t, "crammd5", flagAuthMethod, string(types.CramMd5Auth), Settings{Authentication: types.CramMd5Auth}),
-		optErr(t, "invalid", flagAuthMethod, "INVALID", types.ErrAuthenticationInvalid),
+	addCheckOk(t, &checklist, "flag "+flagAuthMethod+" none", []option{{flagAuthMethod, string(types.NoAuthentication)}}, &Settings{Authentication: types.NoAuthentication})
+	addCheckOk(t, &checklist, "flag "+flagAuthMethod+" plain", []option{{flagAuthMethod, string(types.PlainAuth)}}, &Settings{Authentication: types.PlainAuth})
+	addCheckOk(t, &checklist, "flag "+flagAuthMethod+" crammd5", []option{{flagAuthMethod, string(types.CramMd5Auth)}}, &Settings{Authentication: types.CramMd5Auth})
+	addCheckErr(t, &checklist, "flag "+flagAuthMethod+" invalid", []option{{flagAuthMethod, "INVALID"}}, &[]error{types.ErrAuthenticationInvalid})
 
-		optOk(t, "empty", flagLogin, "", Settings{}),
-		optOk(t, "regular", flagLogin, "My Name", Settings{Login: "My Name"}),
-		optOk(t, "unicode", flagLogin, "私の名前", Settings{Login: "私の名前"}),
-		optOk(t, "email", flagLogin, "user@example.com", Settings{Login: "user@example.com"}),
+	addCheckOk(t, &checklist, "flag "+flagLogin+" empty", []option{{flagLogin, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagLogin+" regular", []option{{flagLogin, "My Name"}}, &Settings{Login: "My Name"})
+	addCheckOk(t, &checklist, "flag "+flagLogin+" unicode", []option{{flagLogin, "私の名前"}}, &Settings{Login: "私の名前"})
+	addCheckOk(t, &checklist, "flag "+flagLogin+" email", []option{{flagLogin, "user@example.com"}}, &Settings{Login: "user@example.com"})
 
-		optOk(t, "empty", flagPassword, "", Settings{}),
-		optOk(t, "regular", flagPassword, "MySecret", Settings{Password: "MySecret"}),
-		optOk(t, "unicode", flagPassword, "秘密のパスワード", Settings{Password: "秘密のパスワード"}),
-		optOk(t, "special", flagPassword, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{Password: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
+	addCheckOk(t, &checklist, "flag "+flagPassword+" empty", []option{{flagPassword, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagPassword+" regular", []option{{flagPassword, "MySecret"}}, &Settings{Password: "MySecret"})
+	addCheckOk(t, &checklist, "flag "+flagPassword+" unicode", []option{{flagPassword, "秘密のパスワード"}}, &Settings{Password: "秘密のパスワード"})
+	addCheckOk(t, &checklist, "flag "+flagPassword+" special", []option{{flagPassword, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}}, &Settings{Password: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"})
 
-		optOk(t, "email", flagSender, "sender@example.com", Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}}),
-		optOk(t, "name", flagSender, "Sender<sender@example.com>", Settings{Sender: types.Email{Name: "Sender", Address: "sender@example.com"}}),
-		optErr(t, "empty", flagSender, "", types.ErrEmailInvalid),
-		optErr(t, "no at", flagSender, "sender", types.ErrEmailInvalid),
-		optErr(t, "no domain", flagSender, "sender@", types.ErrEmailInvalid),
+	addCheckOk(t, &checklist, "flag "+flagSender+" email", []option{{flagSender, "sender@example.com"}}, &Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}})
+	addCheckOk(t, &checklist, "flag "+flagSender+" name", []option{{flagSender, "Sender<sender@example.com>"}}, &Settings{Sender: types.Email{Name: "Sender", Address: "sender@example.com"}})
+	addCheckErr(t, &checklist, "flag "+flagSender+" empty", []option{{flagSender, ""}}, &[]error{types.ErrEmailInvalid})
+	addCheckErr(t, &checklist, "flag "+flagSender+" no at", []option{{flagSender, "sender"}}, &[]error{types.ErrEmailInvalid})
+	addCheckErr(t, &checklist, "flag "+flagSender+" no domain", []option{{flagSender, "sender@"}}, &[]error{types.ErrEmailInvalid})
 
-		optOk(t, "empty", flagReplyTo, "", Settings{}),
-		optOk(t, "email", flagReplyTo, "replyto@example.com", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "replyto@example.com"}}}),
-		optOk(t, "emails", flagReplyTo, "reply1@example.com, reply2@example.com", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "reply1@example.com"}, types.Email{Name: "", Address: "reply2@example.com"}}}),
-		optOk(t, "name", flagReplyTo, "ReplyTo<replyto@example.com>", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "ReplyTo", Address: "replyto@example.com"}}}),
-		optOk(t, "names", flagReplyTo, "Reply1<reply1@example.com>,Reply2<reply2@example.com>", Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "Reply1", Address: "reply1@example.com"}, types.Email{Name: "Reply2", Address: "reply2@example.com"}}}),
-		optErr(t, "no at", flagReplyTo, "replyto", types.ErrEmailInvalid),
-		optErr(t, "no domain", flagReplyTo, "replyto@", types.ErrEmailInvalid),
-		optErr(t, "partly", flagReplyTo, "reply1@example.com, reply2", types.ErrEmailInvalid),
+	addCheckOk(t, &checklist, "flag "+flagReplyTo+" empty", []option{{flagReplyTo, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagReplyTo+" email", []option{{flagReplyTo, "replyto@example.com"}}, &Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "replyto@example.com"}}})
+	addCheckOk(t, &checklist, "flag "+flagReplyTo+" emails", []option{{flagReplyTo, "reply1@example.com, reply2@example.com"}}, &Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "", Address: "reply1@example.com"}, types.Email{Name: "", Address: "reply2@example.com"}}})
+	addCheckOk(t, &checklist, "flag "+flagReplyTo+" name", []option{{flagReplyTo, "ReplyTo<replyto@example.com>"}}, &Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "ReplyTo", Address: "replyto@example.com"}}})
+	addCheckOk(t, &checklist, "flag "+flagReplyTo+" names", []option{{flagReplyTo, "Reply1<reply1@example.com>,Reply2<reply2@example.com>"}}, &Settings{ReplyTo: types.EmailAddresses{types.Email{Name: "Reply1", Address: "reply1@example.com"}, types.Email{Name: "Reply2", Address: "reply2@example.com"}}})
+	addCheckErr(t, &checklist, "flag "+flagReplyTo+" no at", []option{{flagReplyTo, "replyto"}}, &[]error{types.ErrEmailInvalid})
+	addCheckErr(t, &checklist, "flag "+flagReplyTo+" no domain", []option{{flagReplyTo, "replyto@"}}, &[]error{types.ErrEmailInvalid})
+	addCheckErr(t, &checklist, "flag "+flagReplyTo+" partly", []option{{flagReplyTo, "reply1@example.com, reply2"}}, &[]error{types.ErrEmailInvalid})
 
-		optOk(t, "empty", flagTo, "", Settings{}),
-		optOk(t, "names", flagTo, "To1<to1@example.com>,To2<to2@example.com>", Settings{RecipientsTo: types.EmailAddresses{types.Email{Name: "To1", Address: "to1@example.com"}, types.Email{Name: "To2", Address: "to2@example.com"}}}),
-		optErr(t, "partly", flagTo, "to1@example.com, to2", types.ErrEmailInvalid),
+	addCheckOk(t, &checklist, "flag "+flagTo+" empty", []option{{flagTo, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagTo+" names", []option{{flagTo, "To1<to1@example.com>,To2<to2@example.com>"}}, &Settings{RecipientsTo: types.EmailAddresses{types.Email{Name: "To1", Address: "to1@example.com"}, types.Email{Name: "To2", Address: "to2@example.com"}}})
+	addCheckErr(t, &checklist, "flag "+flagTo+" partly", []option{{flagTo, "to1@example.com, to2"}}, &[]error{types.ErrEmailInvalid})
 
-		optOk(t, "empty", flagCc, "", Settings{}),
-		optOk(t, "names", flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>", Settings{RecipientsCC: types.EmailAddresses{types.Email{Name: "Cc1", Address: "cc1@example.com"}, types.Email{Name: "Cc2", Address: "cc2@example.com"}}}),
-		optErr(t, "partly", flagCc, "cc1@example.com, cc2", types.ErrEmailInvalid),
+	addCheckOk(t, &checklist, "flag "+flagCc+" empty", []option{{flagCc, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagCc+" names", []option{{flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>"}}, &Settings{RecipientsCC: types.EmailAddresses{types.Email{Name: "Cc1", Address: "cc1@example.com"}, types.Email{Name: "Cc2", Address: "cc2@example.com"}}})
+	addCheckErr(t, &checklist, "flag "+flagCc+" partly", []option{{flagCc, "cc1@example.com, cc2"}}, &[]error{types.ErrEmailInvalid})
 
-		optOk(t, "empty", flagBcc, "", Settings{}),
-		optOk(t, "names", flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>", Settings{RecipientsBCC: types.EmailAddresses{types.Email{Name: "Bcc1", Address: "bcc1@example.com"}, types.Email{Name: "Bcc2", Address: "bcc2@example.com"}}}),
-		optErr(t, "partly", flagBcc, "bcc1@example.com, bcc2", types.ErrEmailInvalid),
+	addCheckOk(t, &checklist, "flag "+flagBcc+" empty", []option{{flagBcc, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagBcc+" names", []option{{flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>"}}, &Settings{RecipientsBCC: types.EmailAddresses{types.Email{Name: "Bcc1", Address: "bcc1@example.com"}, types.Email{Name: "Bcc2", Address: "bcc2@example.com"}}})
+	addCheckErr(t, &checklist, "flag "+flagBcc+" partly", []option{{flagBcc, "bcc1@example.com, bcc2"}}, &[]error{types.ErrEmailInvalid})
 
-		optOk(t, "empty", flagMessageId, "", Settings{}),
-		optOk(t, "regular", flagMessageId, "ID-1234567890", Settings{MessageID: "ID-1234567890"}),
-		optOk(t, "special", flagMessageId, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{MessageID: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
+	addCheckOk(t, &checklist, "flag "+flagMessageId+" empty", []option{{flagMessageId, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagMessageId+" regular", []option{{flagMessageId, "ID-1234567890"}}, &Settings{MessageID: "ID-1234567890"})
+	addCheckOk(t, &checklist, "flag "+flagMessageId+" special", []option{{flagMessageId, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}}, &Settings{MessageID: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"})
 
-		optOk(t, "empty", flagSubject, "", Settings{}),
-		optOk(t, "regular", flagSubject, "Subject", Settings{Subject: "Subject"}),
-		optOk(t, "unicode", flagSubject, "件名", Settings{Subject: "件名"}),
-		optOk(t, "special", flagSubject, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~", Settings{Subject: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}),
+	addCheckOk(t, &checklist, "flag "+flagSubject+" empty", []option{{flagSubject, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagSubject+" regular", []option{{flagSubject, "Subject"}}, &Settings{Subject: "Subject"})
+	addCheckOk(t, &checklist, "flag "+flagSubject+" unicode", []option{{flagSubject, "件名"}}, &Settings{Subject: "件名"})
+	addCheckOk(t, &checklist, "flag "+flagSubject+" special", []option{{flagSubject, "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"}}, &Settings{Subject: "!\"#$%&'()*+,-./:;<=>?@[]\\^_`{}|~"})
 
-		optOk(t, "custom", flagHeader, "X-Test: testing", Settings{Headers: types.Headers{"X-Test: testing"}}),
-		optErr(t, "empty", flagHeader, "", types.ErrHeaderEmpty),
-		optErr(t, "name empty", flagHeader, " : testing", types.ErrHeaderNameEmpty),
-		optErr(t, "body empty", flagHeader, "X-Test: ", types.ErrHeaderBodyEmpty),
-		optErr(t, "no colons", flagHeader, "X-Test testing", types.ErrHeaderNoColon),
-		optErr(t, "2 colons", flagHeader, "X-Test: X-Custom: testing", types.ErrHeaderMultipleColons),
-		optErr(t, "illegal name", flagHeader, "X-試験: testing", types.ErrHeaderNameIllegalChars),
-		optErr(t, "illegal body", flagHeader, "X-Test: 試験", types.ErrHeaderBodyIllegalChars),
-		optOk(t, "length max", flagHeader, headerMax, Settings{Headers: types.Headers{types.Header(headerMax)}}),
-		optErr(t, "length max+1", flagHeader, headerMaxPlus1, types.ErrHeaderLineTooLong),
-		optOk(t, "2 lines max", flagHeader, header2LinesMax, Settings{Headers: types.Headers{types.Header(header2LinesMax)}}),
-		optErr(t, "2 lines max+1", flagHeader, header2LinesMaxPlus1, types.ErrHeaderLineTooLong),
+	addCheckOk(t, &checklist, "flag "+flagHeader+" custom", []option{{flagHeader, "X-Test: testing"}}, &Settings{Headers: types.Headers{"X-Test: testing"}})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" empty", []option{{flagHeader, ""}}, &[]error{types.ErrHeaderEmpty})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" name empty", []option{{flagHeader, " : testing"}}, &[]error{types.ErrHeaderNameEmpty})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" body empty", []option{{flagHeader, "X-Test: "}}, &[]error{types.ErrHeaderBodyEmpty})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" no colons", []option{{flagHeader, "X-Test testing"}}, &[]error{types.ErrHeaderNoColon})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" 2 colons", []option{{flagHeader, "X-Test: X-Custom: testing"}}, &[]error{types.ErrHeaderMultipleColons})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" illegal name", []option{{flagHeader, "X-試験: testing"}}, &[]error{types.ErrHeaderNameIllegalChars})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" illegal body", []option{{flagHeader, "X-Test: 試験"}}, &[]error{types.ErrHeaderBodyIllegalChars})
+	addCheckOk(t, &checklist, "flag "+flagHeader+" length max", []option{{flagHeader, headerMax}}, &Settings{Headers: types.Headers{types.Header(headerMax)}})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" length max+1", []option{{flagHeader, headerMaxPlus1}}, &[]error{types.ErrHeaderLineTooLong})
+	addCheckOk(t, &checklist, "flag "+flagHeader+" 2 lines max", []option{{flagHeader, header2LinesMax}}, &Settings{Headers: types.Headers{types.Header(header2LinesMax)}})
+	addCheckErr(t, &checklist, "flag "+flagHeader+" 2 lines max+1", []option{{flagHeader, header2LinesMaxPlus1}}, &[]error{types.ErrHeaderLineTooLong})
 
-		optOk(t, "empty", flagBodyText, "", Settings{}),
-		optOk(t, "text", flagBodyText, "This is a plain text \nbody.", Settings{BodyText: "This is a plain text \nbody."}),
+	addCheckOk(t, &checklist, "flag "+flagBodyText+" empty", []option{{flagBodyText, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagBodyText+" text", []option{{flagBodyText, "This is a plain text \nbody."}}, &Settings{BodyText: "This is a plain text \nbody."})
 
-		optOk(t, "empty", flagBodyHtml, "", Settings{}),
-		optOk(t, "html", flagBodyHtml, "<p>This is an HTML body.</p>", Settings{BodyHtml: "<p>This is an HTML body.</p>"}),
+	addCheckOk(t, &checklist, "flag "+flagBodyHtml+" empty", []option{{flagBodyHtml, ""}}, &Settings{})
+	addCheckOk(t, &checklist, "flag "+flagBodyHtml+" html", []option{{flagBodyHtml, "<p>This is an HTML body.</p>"}}, &Settings{BodyHtml: "<p>This is an HTML body.</p>"})
 
-		optOk(t, "1 file", flagAttachment, tmpExistingFileName, Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName)}}),
-		optOk(t, "2 file", flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName), Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName), types.FilePath(tmpExistingFileName)}}),
-		optErr(t, "empty", flagAttachment, "", types.ErrFileEmpty),
-		optErr(t, "fake-1", flagAttachment, tmpNonExistingFileName, types.ErrAttachmentInvalid),
-		optErr(t, "fake-2", flagAttachment, tmpNonExistingFileName, types.ErrFileNotExist),
+	addCheckOk(t, &checklist, "flag "+flagAttachment+" 1 file", []option{{flagAttachment, tmpExistingFileName}}, &Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName)}})
+	addCheckOk(t, &checklist, "flag "+flagAttachment+" 2 files", []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName)}}, &Settings{Attachments: types.Attachments{types.FilePath(tmpExistingFileName), types.FilePath(tmpExistingFileName)}})
+	addCheckErr(t, &checklist, "flag "+flagAttachment+" empty", []option{{flagAttachment, ""}}, &[]error{types.ErrFileEmpty})
+	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake-1", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrAttachmentInvalid})
+	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake-2", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrFileNotExist})
 
-		optOk(t, "help", flagHelp, "", Settings{Help: true}),
+	addCheckOk(t, &checklist, "flag "+flagHelp+" help", []option{{flagHelp, ""}}, &Settings{Help: true})
 
-		settOk(t, "normal", flagServerFile, flagSmtpHost, "domain.com", false, false, Settings{SmtpHost: "domain.com"}),
-		settOk(t, "normal", flagServerFile, flagSmtpHost, "domain.com", false, true, Settings{SmtpHost: "domain.com"}),
-		settOk(t, "normal", flagServerFile, flagSmtpHost, "domain.com", true, false, Settings{SmtpHost: "domain.com"}),
-		settOk(t, "normal", flagServerFile, flagSmtpHost, "domain.com", true, true, Settings{SmtpHost: "domain.com"}),
-	}
+	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" normal", flagServerFile, []option{{flagSmtpHost, "domain.com"}}, []option{}, &Settings{SmtpHost: "domain.com"})
 
-	for _, opt := range *options {
+	for _, opt := range checklist {
 		t.Run(opt.name, func(t *testing.T) {
 			if opt.fileName != "" {
 				defer os.Remove(opt.fileName)
@@ -156,111 +166,122 @@ func Test_getFlagsettings(t *testing.T) {
 			os.Args = opt.arguments
 			settings, err := GetSettings(io.Discard)
 
-			if opt.expectedError == nil {
+			if opt.expectedErrors == nil || len(*opt.expectedErrors) == 0 {
 				if err != nil {
 					t.Fatalf("Expected no error, got %s", err)
 				}
 			} else {
 				if err == nil {
-					t.Fatalf("Expected error %s, but got no error", opt.expectedError)
-				} else {
-					// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
-					if strings.Contains(err.Error(), opt.expectedError.Error()) {
-						return // Expected error
+					if len(*opt.expectedErrors) == 1 {
+						t.Fatalf("Expected error %s, but got no error", (*opt.expectedErrors)[0])
 					} else {
-						t.Fatalf("Expected error %s, got %s", opt.expectedError, err.Error())
+						t.Fatalf("Expected errors %s, but got no error", errors.Join(*opt.expectedErrors...))
 					}
+				} else {
+
+					for _, e := range *opt.expectedErrors {
+						// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
+						if !strings.Contains(err.Error(), e.Error()) {
+							t.Fatalf("Expected error %s, got %s", e, err.Error())
+						}
+					}
+					return
 				}
 			}
 
-			if !reflect.DeepEqual(*settings, opt.expectedSettings) {
+			if !reflect.DeepEqual(settings, opt.expectedSettings) {
 				t.Errorf("Expected %v, got %v", opt.expectedSettings, settings)
 			}
 		})
 	}
 }
 
-func optOk(t testing.TB, name, flag, value string, settings Settings) option {
+func addCheckOk(t testing.TB, checklist *[]check, name string, options []option, settings *Settings) {
 	t.Helper()
-	return option{
-		name:             "flag " + flag + " " + name,
-		arguments:        []string{"gosend", "-" + flag, value},
-		expectedSettings: settings,
-		expectedError:    nil,
-	}
+	addCheck(checklist, name, options, settings, nil)
 }
 
-func optErr(t testing.TB, name, flag, value string, expectedErr error) option {
+func addCheckErr(t testing.TB, checklist *[]check, name string, options []option, expectedErrors *[]error) {
 	t.Helper()
-	return option{
-		name:             "flag " + flag + " " + name,
-		arguments:        []string{"gosend", "-" + flag, value},
-		expectedSettings: Settings{},
-		expectedError:    expectedErr,
-	}
+	addCheck(checklist, name, options, nil, expectedErrors)
 }
 
-func settOk(t testing.TB, name, settingsFlag, flag, value string, spaces, quotes bool, settings Settings) option {
+func addSettingsCheckOk(t testing.TB, checklist *[]check, name, settingsFlag string, settingsOptions []option, flagOptions []option, settings *Settings) {
 	t.Helper()
-	sn := getSettingName(flag, name, spaces, quotes)
-	fileName, err := createSettingsFile(sn, flag, value, spaces, quotes)
-	if err != nil {
+	if err := addSettingsCheck(checklist, name, settingsFlag, settingsOptions, flagOptions, settings, nil); err != nil {
 		t.Fatal(err)
 	}
-	return option{
-		name:             sn,
-		arguments:        []string{"gosend", "-" + settingsFlag, fileName},
-		expectedSettings: settings,
-		expectedError:    nil,
-		fileName:         fileName,
-	}
 }
 
-func settErr(t testing.TB, name, settingsFlag, flag, value string, spaces, quotes bool, expectedErr error) option {
+func addSettingsCheckErr(t testing.TB, checklist *[]check, name, settingsFlag string, settingsOptions []option, flagOptions []option, expectedErrors *[]error) {
 	t.Helper()
-	sn := getSettingName(flag, name, spaces, quotes)
-	fileName, err := createSettingsFile(sn, flag, value, spaces, quotes)
-	if err != nil {
+	if err := addSettingsCheck(checklist, name, settingsFlag, settingsOptions, flagOptions, nil, expectedErrors); err != nil {
 		t.Fatal(err)
 	}
-	return option{
-		name:             sn,
-		arguments:        []string{"gosend", "-" + settingsFlag, fileName},
-		expectedSettings: Settings{},
-		expectedError:    expectedErr,
-		fileName:         fileName,
-	}
 }
 
-func getSettingName(flag, name string, spaces, quotes bool) string {
-	sn := "setting " + flag + " " + name
-	if spaces {
-		sn += " SP"
+func addSettingsCheck(checklist *[]check, name, settingsFlag string, settingsOptions []option, flagOptions []option, settings *Settings, expectedErrors *[]error) error {
+
+	for sf := settingsFormat(0); sf < settingsFormat(4); sf++ {
+		namepart := name
+		switch sf {
+		case NoSpacesAndNoQuotes:
+		case NoSpacesAndQuotes:
+			namepart += "_Q"
+		case SpacesAndNoQuotes:
+			namepart += "_SP"
+		case SpacesAndQuotes:
+			namepart += "_SP_Q"
+		}
+
+		fileName, err := createSettingsFile(namepart, settingsOptions, sf)
+		if err != nil {
+			return err
+		}
+
+		flagOptions = append(flagOptions, option{settingsFlag, fileName})
+		addCheck(checklist, namepart, flagOptions, settings, expectedErrors)
 	}
-	if quotes {
-		sn += " QU"
-	}
-	return sn
+	return nil
 }
 
-func createSettingsFile(name, flag, value string, spaces, quotes bool) (string, error) {
+func addCheck(checklist *[]check, name string, options []option, settings *Settings, expectedErrors *[]error) {
+	*checklist = append(*checklist, check{
+		name:             name,
+		arguments:        getArguments(options),
+		expectedSettings: settings,
+		expectedErrors:   expectedErrors,
+	})
+}
+
+func getArguments(options []option) []string {
+	args := make([]string, 0, (2*len(options))+1)
+	args = append(args, "gosend")
+	for _, opt := range options {
+		args = append(args, "-"+opt.name, opt.value)
+	}
+	return args
+}
+
+func createSettingsFile(name string, options []option, format settingsFormat) (string, error) {
 	tmpFile, err := os.CreateTemp(os.TempDir(), name)
 	if err != nil {
 		return "", err
 	}
 	defer tmpFile.Close()
 	fileName := tmpFile.Name()
-	if flag != "" {
+
+	for _, opt := range options {
 		var text string
-		switch {
-		case !spaces && !quotes:
-			text = fmt.Sprintf("%s=%s", flag, value)
-		case !spaces && quotes:
-			text = fmt.Sprintf("%s=\"%s\"", flag, value)
-		case spaces && !quotes:
-			text = fmt.Sprintf("%s = %s", flag, value)
-		case spaces && quotes:
-			text = fmt.Sprintf("%s = \"%s\"", flag, value)
+		switch format {
+		case NoSpacesAndNoQuotes:
+			text = fmt.Sprintf("%s=%s", opt.name, opt.value)
+		case NoSpacesAndQuotes:
+			text = fmt.Sprintf("%s=\"%s\"", opt.name, opt.value)
+		case SpacesAndNoQuotes:
+			text = fmt.Sprintf("%s = %s", opt.name, opt.value)
+		case SpacesAndQuotes:
+			text = fmt.Sprintf("%s = \"%s\"", opt.name, opt.value)
 		}
 		if _, err := fmt.Fprintln(tmpFile, text); err != nil {
 			return "", err
