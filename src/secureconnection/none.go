@@ -20,10 +20,10 @@ func NewConnectNone(hostname string, port int) *ConnectNone {
 func (c *ConnectNone) Check() error {
 	var errMsgs []error
 	if (*c).hostname == "" {
-		errMsgs = append(errMsgs, fmt.Errorf("no hostname provided"))
+		errMsgs = append(errMsgs, ErrNoHostname)
 	}
 	if (*c).port == 0 {
-		errMsgs = append(errMsgs, fmt.Errorf("no tcp-port provided"))
+		errMsgs = append(errMsgs, ErrNoPort)
 	}
 	return errors.Join(errMsgs...)
 }

@@ -1,11 +1,22 @@
 package secureconnection
 
 import (
+	"errors"
 	"fmt"
 	"net/smtp"
 
 	"github.com/Sternisaea/gosend/src/cmdflags"
 	"github.com/Sternisaea/gosend/src/types"
+)
+
+var (
+	ErrNoHostname              = errors.New("no hostname provided")
+	ErrNoPort                  = errors.New("no tcp-port provided")
+	ErrFileDoesNotExist        = errors.New("file does not exist")
+	ErrFile                    = errors.New("error file")
+	ErrFailedAppendCertificate = errors.New("failed to append PEM certificate")
+	ErrStarttlsNotSupported    = errors.New("server does not support STARTTLS")
+	ErrSslTlsNotSupported      = errors.New("server does not support SSL/TLS")
 )
 
 type SecureConnection interface {

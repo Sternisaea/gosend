@@ -22,10 +22,10 @@ func NewConnectSslTls(hostname string, port int, rootCaPath string) *ConnectSslT
 func (c *ConnectSslTls) Check() error {
 	var errMsgs []error
 	if (*c).hostname == "" {
-		errMsgs = append(errMsgs, fmt.Errorf("no hostname provided"))
+		errMsgs = append(errMsgs, ErrNoHostname)
 	}
 	if (*c).port == 0 {
-		errMsgs = append(errMsgs, fmt.Errorf("no tcp-port provided"))
+		errMsgs = append(errMsgs, ErrNoPort)
 	}
 	if (*c).rootCaPath != "" {
 		errMsgs = append(errMsgs, checkPath((*c).rootCaPath))
@@ -59,7 +59,7 @@ func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {
 
 	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", (*c).hostname, (*c).port), config)
 	if err != nil {
-		return nil, nil, fmt.Errorf("server %s does not support SSL/TLS: %s", (*c).hostname, err)
+		return nil, nil, fmt.Errorf("%w : %w", ErrSslTlsNotSupported, err)
 	}
 	client, err := smtp.NewClient(conn, (*c).hostname)
 	if err != nil {

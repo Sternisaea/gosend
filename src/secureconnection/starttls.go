@@ -24,10 +24,10 @@ func NewConnectStarttls(hostname string, port int, rootCaPath string) *ConnectSt
 func (c *ConnectStarttls) Check() error {
 	var errMsgs []error
 	if (*c).hostname == "" {
-		errMsgs = append(errMsgs, fmt.Errorf("no hostname provided"))
+		errMsgs = append(errMsgs, ErrNoHostname)
 	}
 	if (*c).port == 0 {
-		errMsgs = append(errMsgs, fmt.Errorf("no tcp-port provided"))
+		errMsgs = append(errMsgs, ErrNoPort)
 	}
 	if (*c).rootCaPath != "" {
 		errMsgs = append(errMsgs, checkPath((*c).rootCaPath))
@@ -55,7 +55,7 @@ func (c *ConnectStarttls) ClientConnect() (*smtp.Client, func() error, error) {
 
 	if ok, _ := client.Extension(StartTls); !ok {
 		client.Close()
-		return nil, nil, fmt.Errorf("server %s does not support STARTTLS", (*c).hostname)
+		return nil, nil, fmt.Errorf("%w : %s", ErrStarttlsNotSupported, (*c).hostname)
 	}
 
 	config := &tls.Config{
