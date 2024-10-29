@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"reflect"
@@ -20,10 +21,13 @@ import (
 )
 
 type check struct {
-	name               string
-	settings           *cmdflags.Settings
-	expectedConnection SecureConnection
-	expectedErrors     *[]error
+	name                    string
+	settings                *cmdflags.Settings
+	expectedConnection      SecureConnection
+	expectedConstructErrors *[]error
+	expectedSecurityType    types.Security
+	expectedHostName        string
+	expectedCheckErrors     *[]error
 }
 
 const NoSecurity = "No Security"
@@ -38,77 +42,99 @@ func Test_GetSecureConnection(t *testing.T) {
 
 	checklist := make([]check, 0, 100)
 
-	addCheckOk(t, &checklist, NoSecurity+" regular", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectNone{hostname: "mail.domain.local", port: 587})
-	addCheckErr(t, &checklist, NoSecurity+" no domain", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "", SmtpPort: 587}, &[]error{ErrNoHostname})
-	addCheckErr(t, &checklist, NoSecurity+" no port", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 0}, &[]error{ErrNoPort})
+	addCheck(t, &checklist, NoSecurity+" regular", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectNone{hostname: "mail.domain.local", port: 587}, nil, types.NoSecurity, "mail.domain.local", nil)
+	addCheck(t, &checklist, NoSecurity+" no domain", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "", SmtpPort: 587}, &ConnectNone{port: 587}, nil, types.NoSecurity, "", &[]error{ErrNoHostname})
+	addCheck(t, &checklist, NoSecurity+" no port", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectNone{hostname: "mail.domain.local"}, nil, types.NoSecurity, "mail.domain.local", &[]error{ErrNoPort})
 
-	addCheckOk(t, &checklist, types.StartTlsSec.String()+" regular", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectStarttls{hostname: "mail.domain.local", port: 587})
-	addCheckOk(t, &checklist, types.StartTlsSec.String()+" certificate", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587, RootCA: types.FilePath(validCert)}, &ConnectStarttls{hostname: "mail.domain.local", port: 587, rootCaPath: validCert})
-	addCheckErr(t, &checklist, types.StartTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "", SmtpPort: 587}, &[]error{ErrNoHostname})
-	addCheckErr(t, &checklist, types.StartTlsSec.String()+" no port", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &[]error{ErrNoPort})
+	addCheck(t, &checklist, types.StartTlsSec.String()+" regular", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectStarttls{hostname: "mail.domain.local", port: 587}, nil, types.StartTlsSec, "mail.domain.local", nil)
+	addCheck(t, &checklist, types.StartTlsSec.String()+" certificate", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587, RootCA: types.FilePath(validCert)}, &ConnectStarttls{hostname: "mail.domain.local", port: 587, rootCaPath: validCert}, nil, types.StartTlsSec, "mail.domain.local", nil)
+	addCheck(t, &checklist, types.StartTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "", SmtpPort: 587}, &ConnectStarttls{port: 587}, nil, types.StartTlsSec, "", &[]error{ErrNoHostname})
+	addCheck(t, &checklist, types.StartTlsSec.String()+" no port", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectStarttls{hostname: "mail.domain.local"}, nil, types.StartTlsSec, "mail.domain.local", &[]error{ErrNoPort})
 
-	addCheckOk(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectSslTls{hostname: "mail.domain.local", port: 587})
-	addCheckErr(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: 587}, &[]error{ErrNoHostname})
-	addCheckErr(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &[]error{ErrNoPort})
+	addCheck(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectSslTls{hostname: "mail.domain.local", port: 587}, nil, types.SslTlsSec, "mail.domain.local", nil)
+	addCheck(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: 587}, &ConnectSslTls{port: 587}, nil, types.SslTlsSec, "", &[]error{ErrNoHostname})
+	addCheck(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectSslTls{hostname: "mail.domain.local"}, nil, types.SslTlsSec, "mail.domain.local", &[]error{ErrNoPort})
 
-	addCheckErr(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: 586}, &[]error{ErrUnknownProtocol})
+	addCheck(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: 586}, nil, &[]error{ErrUnknownProtocol}, types.NoSecurity, "", nil)
 
 	for _, c := range checklist {
+		// Test GetSecureConnection Constructor
 		t.Run(c.name, func(t *testing.T) {
 
 			sc, err := GetSecureConnection(c.settings)
-			if err == nil {
-				err = sc.Check()
-			}
 
-			if c.expectedErrors == nil || len(*c.expectedErrors) == 0 {
+			if cont, err := checkError(err, c.expectedConstructErrors); !cont || err != nil {
 				if err != nil {
-					t.Fatalf("Expected no error, got %s", err)
+					t.Fatal(err)
 				}
-			} else {
-				if err == nil {
-					if len(*c.expectedErrors) == 1 {
-						t.Fatalf("Expected error %s, but got no error", (*c.expectedErrors)[0])
-					} else {
-						t.Fatalf("Expected errors %s, but got no error", errors.Join(*c.expectedErrors...))
-					}
-				} else {
-					for _, e := range *c.expectedErrors {
-						// Cannot use 'errors.Is' because flag package does not wrap errors (as for go1.23.2)
-						if !strings.Contains(err.Error(), e.Error()) {
-							t.Errorf("Expected error %s, got %s", e, err.Error())
-						}
-					}
-					return
-				}
-
+				return
 			}
 
 			if !reflect.DeepEqual(sc, c.expectedConnection) {
-				t.Errorf("Expected %v, got %v", c.expectedConnection, sc)
+				t.Fatalf("Expected %v, got %v", c.expectedConnection, sc)
 			}
 
-			// if sc != c.expectedConnection {
-			// 	t.Errorf("Expected %v, got %v", c.expectedConnection, sc)
-			// }
+			// Test GetType
+			t.Run(c.name+" Type", func(t *testing.T) {
+				secType := sc.GetType()
+				if c.expectedSecurityType != secType {
+					t.Errorf("Expected SecurityType %s, got %s", c.expectedSecurityType, secType)
+				}
+			})
+
+			// Test HostName
+			t.Run(c.name+" Host", func(t *testing.T) {
+				hostName := sc.GetHostName()
+				if c.expectedHostName != hostName {
+					t.Errorf("Expected hostname %s, got %s", c.expectedHostName, hostName)
+				}
+			})
+
+			// Test Check
+			t.Run(c.name+" Check", func(t *testing.T) {
+				err := sc.Check()
+
+				if cont, err := checkError(err, c.expectedCheckErrors); !cont || err != nil {
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			})
+
+			// Test ClientConnect
+			// Todo: test ClientConnect
+
 		})
 	}
-
 }
 
-func addCheckOk(t testing.TB, checklist *[]check, name string, settings *cmdflags.Settings, expectedConnection SecureConnection) {
+func addCheck(t testing.TB, checklist *[]check, name string, settings *cmdflags.Settings, expectedConnection SecureConnection, expectedConstructErrors *[]error, expectedSecurityType types.Security, expectedHostName string, expectedCheckErrors *[]error) {
 	t.Helper()
-	addCheck(checklist, name, settings, expectedConnection, nil)
+	*checklist = append(*checklist, check{name: name, settings: settings, expectedConnection: expectedConnection, expectedConstructErrors: expectedConstructErrors, expectedSecurityType: expectedSecurityType, expectedHostName: expectedHostName, expectedCheckErrors: expectedCheckErrors})
 }
 
-func addCheckErr(t testing.TB, checklist *[]check, name string, settings *cmdflags.Settings, expectedErrors *[]error) {
-	t.Helper()
-	addCheck(checklist, name, settings, nil, expectedErrors)
-}
-
-func addCheck(checklist *[]check, name string, settings *cmdflags.Settings, expectedConnection SecureConnection, expectedErrors *[]error) {
-	*checklist = append(*checklist, check{name: name, settings: settings, expectedConnection: expectedConnection, expectedErrors: expectedErrors})
-
+func checkError(occuredErr error, expectedErr *[]error) (bool, error) {
+	if expectedErr == nil || len(*expectedErr) == 0 {
+		if occuredErr != nil {
+			return false, fmt.Errorf("Expected no error, got %s", occuredErr)
+		}
+	} else {
+		if occuredErr == nil {
+			if len(*expectedErr) == 1 {
+				return false, fmt.Errorf("Expected error %s, got no error", (*expectedErr)[0])
+			} else {
+				return false, fmt.Errorf("Expected errors %s, got no error", errors.Join(*expectedErr...))
+			}
+		} else {
+			for _, exp := range *expectedErr {
+				if !strings.Contains(occuredErr.Error(), exp.Error()) {
+					return false, fmt.Errorf("Expected error %s, got %s", exp, occuredErr)
+				}
+			}
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func createCertificate(organisation, hostname string) (string, string, error) {
@@ -122,7 +148,7 @@ func createCertificate(organisation, hostname string) (string, string, error) {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			Organization: []string{"Local Domain for Testing"},
+			Organization: []string{organisation},
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
