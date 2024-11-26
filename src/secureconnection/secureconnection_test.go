@@ -1,23 +1,36 @@
 package secureconnection
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
+	"context"
 	"errors"
 	"fmt"
-	"math/big"
+	"log"
+	"net"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Sternisaea/gosend/src/certificates"
 	"github.com/Sternisaea/gosend/src/cmdflags"
 	"github.com/Sternisaea/gosend/src/types"
+	"github.com/Sternisaea/smtpservermock/src/smtpconst"
+	"github.com/Sternisaea/smtpservermock/src/smtpservermock"
+
+	"github.com/sternisaea/dnsservermock/src/dnsconst"
+	"github.com/sternisaea/dnsservermock/src/dnsservermock"
+	"github.com/sternisaea/dnsservermock/src/dnsstorage/dnsstoragememory"
+)
+
+var (
+	MaxLineLength = 78
+	dnsIP         = "127.0.0.1"
+	dnsPort       = types.TCPPort(5355)
+
+	smtpNoSecurityPort = types.TCPPort(40971)
+	smtpStartTlsPort   = types.TCPPort(40972)
+	smtpTlsPort        = types.TCPPort(40973)
 )
 
 type check struct {
@@ -28,34 +41,88 @@ type check struct {
 	expectedSecurityType    types.Security
 	expectedHostName        string
 	expectedCheckErrors     *[]error
+	expectedConnectErrors   *[]error
 }
 
 const NoSecurity = "No Security"
 
 func Test_GetSecureConnection(t *testing.T) {
-	validCert, validKey, err := createCertificate("Domain Local", "mail.domain.local")
+	cancelDns, err := startDns(net.ParseIP(dnsIP), int(dnsPort))
 	if err != nil {
-		t.Errorf("Error creating certificate %s", err)
+		t.Fatalf("Cannot start DNS server: %s", err)
+	}
+	defer cancelDns()
+
+	setDefaultResolver(fmt.Sprintf("%s:%d", dnsIP, dnsPort))
+
+	validCert, validKey, err := certificates.CreateCertificate("Domain Local", "mail.domain.local")
+	if err != nil {
+		t.Fatalf("Error creating certificate: %s", err)
 	}
 	defer os.Remove(validKey)
 	defer os.Remove(validCert)
 
+	mockSmtpNoSecurity, err := smtpservermock.NewSmtpServer(
+		smtpconst.NoSecurity,
+		"Mock SMTP Server without security",
+		getAddress("localhost", smtpNoSecurityPort),
+		"",
+		"")
+	if err != nil {
+		t.Fatalf("Cannot initialise SMTP server without security: %s", err)
+	}
+	if err := mockSmtpNoSecurity.ListenAndServe(); err != nil {
+		t.Fatalf("Cannot start SMTP server without security: %s", err)
+	}
+	defer mockSmtpNoSecurity.Shutdown()
+
+	mockSmtpStarttls, err := smtpservermock.NewSmtpServer(
+		smtpconst.StartTlsSec,
+		"Mock SMTP Server with STARTTLS",
+		getAddress("localhost", smtpStartTlsPort),
+		validCert,
+		validKey)
+	if err != nil {
+		t.Fatalf("Cannot initialise SMTP server with STARTTLS: %s", err)
+	}
+	if err := mockSmtpStarttls.ListenAndServe(); err != nil {
+		t.Fatalf("Cannot start SMTP server with STARTTLS: %s", err)
+	}
+	defer mockSmtpStarttls.Shutdown()
+
+	mockSmtpTls, err := smtpservermock.NewSmtpServer(
+		smtpconst.SslTlsSec,
+		"Mock SMTP Server with TLS",
+		getAddress("localhost", smtpTlsPort),
+		validCert,
+		validKey)
+	if err != nil {
+		t.Fatalf("Cannot initialise SMTP server with TLS: %s", err)
+	}
+	if err := mockSmtpTls.ListenAndServe(); err != nil {
+		t.Fatalf("Cannot start SMTP server with TLS: %s", err)
+	}
+	defer mockSmtpTls.Shutdown()
+
 	checklist := make([]check, 0, 100)
 
-	addCheck(t, &checklist, NoSecurity+" regular", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectNone{hostname: "mail.domain.local", port: 587}, nil, types.NoSecurity, "mail.domain.local", nil)
-	addCheck(t, &checklist, NoSecurity+" no domain", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "", SmtpPort: 587}, &ConnectNone{port: 587}, nil, types.NoSecurity, "", &[]error{ErrNoHostname})
-	addCheck(t, &checklist, NoSecurity+" no port", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectNone{hostname: "mail.domain.local"}, nil, types.NoSecurity, "mail.domain.local", &[]error{ErrNoPort})
+	addCheck(t, &checklist, NoSecurity+" LOCALHOST", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "localhost", SmtpPort: smtpNoSecurityPort}, &ConnectNone{hostname: "localhost", port: int(smtpNoSecurityPort)}, nil, types.NoSecurity, "localhost", nil, nil)
+	addCheck(t, &checklist, NoSecurity+" MAILDOMAIN", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: smtpNoSecurityPort}, &ConnectNone{hostname: "mail.domain.local", port: int(smtpNoSecurityPort)}, nil, types.NoSecurity, "mail.domain.local", nil, nil)
 
-	addCheck(t, &checklist, types.StartTlsSec.String()+" regular", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectStarttls{hostname: "mail.domain.local", port: 587}, nil, types.StartTlsSec, "mail.domain.local", nil)
-	addCheck(t, &checklist, types.StartTlsSec.String()+" certificate", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587, RootCA: types.FilePath(validCert)}, &ConnectStarttls{hostname: "mail.domain.local", port: 587, rootCaPath: validCert}, nil, types.StartTlsSec, "mail.domain.local", nil)
-	addCheck(t, &checklist, types.StartTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "", SmtpPort: 587}, &ConnectStarttls{port: 587}, nil, types.StartTlsSec, "", &[]error{ErrNoHostname})
-	addCheck(t, &checklist, types.StartTlsSec.String()+" no port", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectStarttls{hostname: "mail.domain.local"}, nil, types.StartTlsSec, "mail.domain.local", &[]error{ErrNoPort})
+	addCheck(t, &checklist, NoSecurity+" regular", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: smtpNoSecurityPort}, &ConnectNone{hostname: "mail.domain.local", port: int(smtpNoSecurityPort)}, nil, types.NoSecurity, "mail.domain.local", nil, nil)
+	addCheck(t, &checklist, NoSecurity+" no domain", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "", SmtpPort: smtpNoSecurityPort}, &ConnectNone{port: int(smtpNoSecurityPort)}, nil, types.NoSecurity, "", &[]error{ErrNoHostname}, nil)
+	addCheck(t, &checklist, NoSecurity+" no port", &cmdflags.Settings{Security: types.NoSecurity, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectNone{hostname: "mail.domain.local"}, nil, types.NoSecurity, "mail.domain.local", &[]error{ErrNoPort}, nil)
 
-	addCheck(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 587}, &ConnectSslTls{hostname: "mail.domain.local", port: 587}, nil, types.SslTlsSec, "mail.domain.local", nil)
-	addCheck(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: 587}, &ConnectSslTls{port: 587}, nil, types.SslTlsSec, "", &[]error{ErrNoHostname})
-	addCheck(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectSslTls{hostname: "mail.domain.local"}, nil, types.SslTlsSec, "mail.domain.local", &[]error{ErrNoPort})
+	// addCheck(t, &checklist, types.StartTlsSec.String()+" regular", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: types.TCPPort(smtpStartTlsPort)}, &ConnectStarttls{hostname: "mail.domain.local", port: smtpStartTlsPort}, nil, types.StartTlsSec, "mail.domain.local", nil, nil)
+	// addCheck(t, &checklist, types.StartTlsSec.String()+" certificate", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: types.TCPPort(smtpStartTlsPort), RootCA: types.FilePath(validCert)}, &ConnectStarttls{hostname: "mail.domain.local", port: smtpStartTlsPort, rootCaPath: validCert}, nil, types.StartTlsSec, "mail.domain.local", nil, nil)
+	// addCheck(t, &checklist, types.StartTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "", SmtpPort: types.TCPPort(smtpStartTlsPort)}, &ConnectStarttls{port: smtpStartTlsPort}, nil, types.StartTlsSec, "", &[]error{ErrNoHostname}, nil)
+	// addCheck(t, &checklist, types.StartTlsSec.String()+" no port", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectStarttls{hostname: "mail.domain.local"}, nil, types.StartTlsSec, "mail.domain.local", &[]error{ErrNoPort}, nil)
 
-	addCheck(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: 586}, nil, &[]error{ErrUnknownProtocol}, types.NoSecurity, "", nil)
+	// addCheck(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: types.TCPPort(smtpTlsPort)}, &ConnectSslTls{hostname: "mail.domain.local", port: smtpTlsPort}, nil, types.SslTlsSec, "mail.domain.local", nil, nil)
+	// addCheck(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: types.TCPPort(smtpTlsPort)}, &ConnectSslTls{port: smtpTlsPort}, nil, types.SslTlsSec, "", &[]error{ErrNoHostname}, nil)
+	// addCheck(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectSslTls{hostname: "mail.domain.local"}, nil, types.SslTlsSec, "mail.domain.local", &[]error{ErrNoPort}, nil)
+
+	// addCheck(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: 586}, nil, &[]error{ErrUnknownProtocol}, types.NoSecurity, "", nil, nil)
 
 	for _, c := range checklist {
 		// Test GetSecureConnection Constructor
@@ -102,15 +169,33 @@ func Test_GetSecureConnection(t *testing.T) {
 			})
 
 			// Test ClientConnect
-			// Todo: test ClientConnect
+			t.Run(c.name+" ClientConnect", func(t *testing.T) {
+				_, close, err := sc.ClientConnect()
+				if err == nil {
+					defer close()
+				} else {
+					log.Printf("Error: %s", err)
+				}
+
+				if cont, err := checkError(err, c.expectedConnectErrors); !cont || err != nil {
+					if err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+
+				// Check if right data is returned
+				// x := smtpserver.GetInfo()
+				// log.Printf("ANSWER: %s", x)
+			})
 
 		})
 	}
 }
 
-func addCheck(t testing.TB, checklist *[]check, name string, settings *cmdflags.Settings, expectedConnection SecureConnection, expectedConstructErrors *[]error, expectedSecurityType types.Security, expectedHostName string, expectedCheckErrors *[]error) {
+func addCheck(t testing.TB, checklist *[]check, name string, settings *cmdflags.Settings, expectedConnection SecureConnection, expectedConstructErrors *[]error, expectedSecurityType types.Security, expectedHostName string, expectedCheckErrors *[]error, expectedConnectErrors *[]error) {
 	t.Helper()
-	*checklist = append(*checklist, check{name: name, settings: settings, expectedConnection: expectedConnection, expectedConstructErrors: expectedConstructErrors, expectedSecurityType: expectedSecurityType, expectedHostName: expectedHostName, expectedCheckErrors: expectedCheckErrors})
+	*checklist = append(*checklist, check{name: name, settings: settings, expectedConnection: expectedConnection, expectedConstructErrors: expectedConstructErrors, expectedSecurityType: expectedSecurityType, expectedHostName: expectedHostName, expectedCheckErrors: expectedCheckErrors, expectedConnectErrors: expectedConnectErrors})
 }
 
 func checkError(occuredErr error, expectedErr *[]error) (bool, error) {
@@ -137,52 +222,60 @@ func checkError(occuredErr error, expectedErr *[]error) (bool, error) {
 	return true, nil
 }
 
-func createCertificate(organisation, hostname string) (string, string, error) {
-	// Generate a private key
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return "", "", err
-	}
+// func Test_Delay(t *testing.T) {
+// 	time.Sleep(20 * time.Second)
+// }
 
-	// Create a certificate template
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization: []string{organisation},
+func startDns(ip net.IP, port int) (func() error, error) {
+	store := dnsstoragememory.NewMemoryStore()
+	(*store).Set("domain.local", dnsconst.Type_A, "127.0.0.1")
+	(*store).Set("mail.domain.local", dnsconst.Type_A, "127.0.0.1")
+	(*store).Set("domain.local", dnsconst.Type_AAAA, "::1")
+	(*store).Set("mail.domain.local", dnsconst.Type_AAAA, "::1")
+	(*store).Set("domain.local", dnsconst.Type_MX, "mail.domain.local")
+
+	ds := dnsservermock.NewDnsServer(ip, port, store)
+	if err := (*ds).Start(); err != nil {
+		return nil, err
+	}
+	return (*ds).Stop, nil
+}
+
+func setDefaultResolver(dnsAddress string) {
+	cr := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: time.Second,
+			}
+			return d.DialContext(ctx, "udp", dnsAddress)
 		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{hostname},
 	}
+	net.DefaultResolver = cr
+}
 
-	// Create a self-signed certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if err != nil {
-		return "", "", err
-	}
+func getAddress(host string, port types.TCPPort) string {
+	return fmt.Sprintf("%s:%d", host, port)
+}
 
-	// Encode the certificate to PEM format
-	certOut, err := os.CreateTemp(os.TempDir(), "cert.pem")
-	if err != nil {
-		return "", "", err
+func lookupIP(domain string) {
+	customResolver := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: time.Second,
+			}
+			return d.DialContext(ctx, "udp", "127.0.0.1:5355")
+		},
 	}
-	defer certOut.Close()
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	// net.DefaultResolver = customResolver
 
-	// Encode the private key to PEM format
-	keyOut, err := os.CreateTemp(os.TempDir(), "key.pem")
+	ips, err := customResolver.LookupIP(context.Background(), "ip4", domain)
 	if err != nil {
-		return "", "", err
+		fmt.Printf("Could not get IPs: %v\n", err)
+		return
 	}
-	defer keyOut.Close()
-	privBytes, err := x509.MarshalECPrivateKey(priv)
-	if err != nil {
-		return "", "", err
+	for _, ip := range ips {
+		fmt.Printf("IP address: %s\n", ip.String())
 	}
-	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privBytes})
-
-	return certOut.Name(), keyOut.Name(), nil
 }
