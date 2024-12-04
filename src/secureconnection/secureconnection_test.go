@@ -118,11 +118,11 @@ func Test_GetSecureConnection(t *testing.T) {
 	addCheck(t, &checklist, types.StartTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "", SmtpPort: smtpStartTlsPort}, &ConnectStarttls{port: int(smtpStartTlsPort)}, nil, types.StartTlsSec, "", &[]error{ErrNoHostname}, &[]error{ErrNoHostname})
 	addCheck(t, &checklist, types.StartTlsSec.String()+" no port", &cmdflags.Settings{Security: types.StartTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectStarttls{hostname: "mail.domain.local"}, nil, types.StartTlsSec, "mail.domain.local", &[]error{ErrNoPort}, &[]error{ErrNoPort})
 
-	// addCheck(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: smtpTlsPort}, &ConnectSslTls{hostname: "mail.domain.local", port: int(smtpTlsPort)}, nil, types.SslTlsSec, "mail.domain.local", nil, nil)
-	// addCheck(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: smtpTlsPort}, &ConnectSslTls{port: int(smtpTlsPort)}, nil, types.SslTlsSec, "", &[]error{ErrNoHostname}, nil)
-	// addCheck(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0}, &ConnectSslTls{hostname: "mail.domain.local"}, nil, types.SslTlsSec, "mail.domain.local", &[]error{ErrNoPort}, nil)
+	addCheck(t, &checklist, types.SslTlsSec.String()+" regular", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: smtpTlsPort, RootCA: types.FilePath(validCert)}, &ConnectSslTls{hostname: "mail.domain.local", port: int(smtpTlsPort), rootCaPath: validCert}, nil, types.SslTlsSec, "mail.domain.local", nil, nil)
+	addCheck(t, &checklist, types.SslTlsSec.String()+" no domain", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "", SmtpPort: smtpTlsPort, RootCA: types.FilePath(validCert)}, &ConnectSslTls{port: int(smtpTlsPort), rootCaPath: validCert}, nil, types.SslTlsSec, "", &[]error{ErrNoHostname}, &[]error{ErrNoHostname})
+	addCheck(t, &checklist, types.SslTlsSec.String()+" no port", &cmdflags.Settings{Security: types.SslTlsSec, SmtpHost: "mail.domain.local", SmtpPort: 0, RootCA: types.FilePath(validCert)}, &ConnectSslTls{hostname: "mail.domain.local", rootCaPath: validCert}, nil, types.SslTlsSec, "mail.domain.local", &[]error{ErrNoPort}, &[]error{ErrNoPort})
 
-	// addCheck(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: 586}, nil, &[]error{ErrUnknownProtocol}, types.NoSecurity, "", nil, nil)
+	addCheck(t, &checklist, "unkknown protocol", &cmdflags.Settings{Security: "UNKNOWN", SmtpHost: "mail.domain.local", SmtpPort: smtpNoSecurityPort}, nil, &[]error{ErrUnknownProtocol}, types.NoSecurity, "", nil, nil)
 
 	for _, c := range checklist {
 		// Test GetSecureConnection Constructor
@@ -141,32 +141,32 @@ func Test_GetSecureConnection(t *testing.T) {
 				t.Fatalf("Expected %v, got %v", c.expectedConnection, sc)
 			}
 
-			// // Test GetType
-			// t.Run(c.name+" Type", func(t *testing.T) {
-			// 	secType := sc.GetType()
-			// 	if c.expectedSecurityType != secType {
-			// 		t.Errorf("Expected SecurityType %s, got %s", c.expectedSecurityType, secType)
-			// 	}
-			// })
+			// Test GetType
+			t.Run(c.name+" Type", func(t *testing.T) {
+				secType := sc.GetType()
+				if c.expectedSecurityType != secType {
+					t.Errorf("Expected SecurityType %s, got %s", c.expectedSecurityType, secType)
+				}
+			})
 
-			// // Test HostName
-			// t.Run(c.name+" Host", func(t *testing.T) {
-			// 	hostName := sc.GetHostName()
-			// 	if c.expectedHostName != hostName {
-			// 		t.Errorf("Expected hostname %s, got %s", c.expectedHostName, hostName)
-			// 	}
-			// })
+			// Test HostName
+			t.Run(c.name+" Host", func(t *testing.T) {
+				hostName := sc.GetHostName()
+				if c.expectedHostName != hostName {
+					t.Errorf("Expected hostname %s, got %s", c.expectedHostName, hostName)
+				}
+			})
 
-			// // Test Check
-			// t.Run(c.name+" Check", func(t *testing.T) {
-			// 	err := sc.Check()
+			// Test Check
+			t.Run(c.name+" Check", func(t *testing.T) {
+				err := sc.Check()
 
-			// 	if cont, err := checkError(err, c.expectedCheckErrors); !cont || err != nil {
-			// 		if err != nil {
-			// 			t.Fatal(err)
-			// 		}
-			// 	}
-			// })
+				if cont, err := checkError(err, c.expectedCheckErrors); !cont || err != nil {
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			})
 
 			// Test ClientConnect
 			t.Run(c.name+" ClientConnect", func(t *testing.T) {
