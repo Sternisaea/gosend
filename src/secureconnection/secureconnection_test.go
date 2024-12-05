@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"reflect"
@@ -173,8 +172,6 @@ func Test_GetSecureConnection(t *testing.T) {
 				_, close, err := sc.ClientConnect()
 				if err == nil {
 					defer close()
-				} else {
-					log.Printf("Error: %s", err) // TEST
 				}
 
 				if cont, err := checkError(err, c.expectedConnectErrors); !cont || err != nil {
@@ -183,17 +180,6 @@ func Test_GetSecureConnection(t *testing.T) {
 					}
 					return
 				}
-
-				// TEST.begin
-				// crt := mockSmtpNoSecurity.GetRawText()
-				// for id, lines := range crt {
-				// 	fmt.Printf("\n%s\n---------------------------------\n", id)
-				// 	for _, l := range lines {
-				// 		fmt.Printf("%s", l)
-				// 	}
-				// }
-				// TEST.end
-
 			})
 		})
 	}
@@ -228,10 +214,6 @@ func checkError(occuredErr error, expectedErr *[]error) (bool, error) {
 	return true, nil
 }
 
-// func Test_Delay(t *testing.T) {
-// 	time.Sleep(20 * time.Second)
-// }
-
 func startDns(ip net.IP, port int) (func() error, error) {
 	store := dnsstoragememory.NewMemoryStore()
 	(*store).Set("domain.local", dnsconst.Type_A, "127.0.0.1")
@@ -263,25 +245,3 @@ func setDefaultResolver(dnsAddress string) {
 func getAddress(host string, port types.TCPPort) string {
 	return fmt.Sprintf("%s:%d", host, port)
 }
-
-// func lookupIP(domain string) {
-// 	customResolver := &net.Resolver{
-// 		PreferGo: true,
-// 		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
-// 			d := net.Dialer{
-// 				Timeout: time.Second,
-// 			}
-// 			return d.DialContext(ctx, "udp", "127.0.0.1:5355")
-// 		},
-// 	}
-// 	// net.DefaultResolver = customResolver
-
-// 	ips, err := customResolver.LookupIP(context.Background(), "ip4", domain)
-// 	if err != nil {
-// 		fmt.Printf("Could not get IPs: %v\n", err)
-// 		return
-// 	}
-// 	for _, ip := range ips {
-// 		fmt.Printf("IP address: %s\n", ip.String())
-// 	}
-// }
