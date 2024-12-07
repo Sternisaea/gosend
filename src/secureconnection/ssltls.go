@@ -41,9 +41,9 @@ func (c *ConnectSslTls) GetHostName() string {
 	return (*c).hostname
 }
 
-func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {
+func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, string, error) {
 	if err := c.Check(); err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	config := &tls.Config{
@@ -53,18 +53,18 @@ func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {
 		var err error
 		(*config).RootCAs, err = getPemCertificate((*c).rootCaPath)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, "", err
 		}
 	}
 
 	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", (*c).hostname, (*c).port), config)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w : %w", ErrSslTlsNotSupported, err)
+		return nil, nil, "", fmt.Errorf("%w : %w", ErrSslTlsNotSupported, err)
 	}
 	client, err := smtp.NewClient(conn, (*c).hostname)
 	if err != nil {
 		conn.Close()
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	close := func() error {
@@ -75,5 +75,5 @@ func (c *ConnectSslTls) ClientConnect() (*smtp.Client, func() error, error) {
 		}
 		return nil
 	}
-	return client, close, nil
+	return client, close, conn.LocalAddr().String(), nil
 }

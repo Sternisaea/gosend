@@ -15,6 +15,7 @@ type SmtpSend struct {
 	connection     secureconnection.SecureConnection
 	authentication authentication.SmtpAuthentication
 	message        *message.Message
+	localAddress   string
 }
 
 func NewSmtpSend(conn secureconnection.SecureConnection, auth authentication.SmtpAuthentication) *SmtpSend {
@@ -69,11 +70,12 @@ func (s *SmtpSend) SendMail() error {
 		return err
 	}
 
-	client, close, err := (*s).connection.ClientConnect()
+	client, close, addr, err := (*s).connection.ClientConnect()
 	if err != nil {
 		return err
 	}
 	defer close()
+	(*s).localAddress = addr
 
 	if err := (*s).authentication.Authenticate(client); err != nil {
 		return err
@@ -83,4 +85,8 @@ func (s *SmtpSend) SendMail() error {
 		return err
 	}
 	return nil
+}
+
+func (s *SmtpSend) GetLocalAddress() string {
+	return (*s).localAddress
 }

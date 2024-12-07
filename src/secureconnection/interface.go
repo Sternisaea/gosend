@@ -22,7 +22,7 @@ var (
 
 type SecureConnection interface {
 	Check() error
-	ClientConnect() (*smtp.Client, func() error, error)
+	ClientConnect() (*smtp.Client, func() error, string, error)
 	GetType() types.Security
 	GetHostName() string
 }

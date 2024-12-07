@@ -169,7 +169,7 @@ func Test_GetSecureConnection(t *testing.T) {
 
 			// Test ClientConnect
 			t.Run(c.name+" ClientConnect", func(t *testing.T) {
-				_, close, err := sc.ClientConnect()
+				_, close, _, err := sc.ClientConnect()
 				if err == nil {
 					defer close()
 				}
