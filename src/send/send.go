@@ -36,7 +36,9 @@ func (s *SmtpSend) CreateMessage(st *cmdflags.Settings) error {
 	msg.SetBodyPlainText(st.BodyText)
 	msg.SetBodyHtml(st.BodyHtml)
 	for _, a := range st.Attachments {
-		msg.AddAttachment(a.String())
+		if _, err := msg.AddAttachment(a.String()); err != nil {
+			return err
+		}
 	}
 	(*s).message = msg
 	return nil

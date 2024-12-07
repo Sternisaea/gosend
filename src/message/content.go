@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/mail"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -48,7 +49,10 @@ func (msg *Message) getContentText() (string, error) {
 }
 
 func (msg *Message) getContentTree() (*content, error) {
-	body := msg.getBodyContent()
+	body, err := msg.getBodyContent()
+	if err != nil {
+		return nil, err
+	}
 	attachs, err := msg.getAttachmentContent()
 	if err != nil {
 		return nil, err
@@ -62,7 +66,10 @@ func (msg *Message) getContentTree() (*content, error) {
 			prts = append(prts, *body)
 		}
 		prts = append(prts, attachs...)
-		bound := getRandomString(20)
+		bound, err := (*msg).getRandomString(20)
+		if err != nil {
+			return nil, err
+		}
 		return &content{
 			boundary: bound,
 			headers:  []string{fmt.Sprintf("Content-Type: multipart/mixed; boundary=\"%s\"", bound)},
@@ -72,7 +79,7 @@ func (msg *Message) getContentTree() (*content, error) {
 	}
 }
 
-func (msg *Message) getBodyContent() *content {
+func (msg *Message) getBodyContent() (*content, error) {
 	var pl, ht content
 	if (*msg).plainText != "" {
 		plaintext := strings.ReplaceAll((*msg).plainText, `\n`, "\n")
@@ -107,19 +114,22 @@ func (msg *Message) getBodyContent() *content {
 
 	switch true {
 	case (*msg).plainText != "" && (*msg).htmlText == "":
-		return &pl
+		return &pl, nil
 	case (*msg).plainText == "" && (*msg).htmlText != "":
-		return &ht
+		return &ht, nil
 	case (*msg).plainText != "" && (*msg).htmlText != "":
-		bound := getRandomString(20)
+		bound, err := (*msg).getRandomString(20)
+		if err != nil {
+			return nil, err
+		}
 		return &content{
 			boundary: bound,
 			headers:  []string{fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", bound)},
 			text:     "",
 			parts:    &[]content{pl, ht},
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (msg *Message) getAttachmentContent() ([]content, error) {
@@ -195,13 +205,22 @@ func (cnt *content) getContentPart(bound string) string {
 	return result
 }
 
-func getRandomString(length int) string {
+func (msg *Message) getRandomString(length int) (string, error) {
+	if (*msg).idPrefix != "" {
+		(*msg).idCounter++
+		c := strconv.Itoa((*msg).idCounter)
+		if len((*msg).idPrefix)+len(c) > length {
+			return "", fmt.Errorf("prefix %s and counter %d do not fit length %d", (*msg).idPrefix, (*msg).idCounter, length)
+		}
+		return fmt.Sprintf("%s%0*d", (*msg).idPrefix, length, (*msg).idCounter), nil
+	}
+
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
-	return string(b)
+	return string(b), nil
 }
 
 func getMailAddressesAsString(addrs []mail.Address) string {

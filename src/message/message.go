@@ -19,6 +19,9 @@ type Message struct {
 	htmlText      string
 	customHeaders []string
 	attachments   []attachment
+
+	idPrefix  string
+	idCounter int
 }
 
 type attachment struct {
@@ -72,15 +75,28 @@ func (msg *Message) SetBodyHtml(htmltext string) {
 	(*msg).htmlText = htmltext
 }
 
-func (msg *Message) AddAttachment(filePath string) string {
+func (msg *Message) AddAttachment(filePath string) (string, error) {
 	return msg.AddAttachmentWithContentType(filePath, "")
 }
 
-func (msg *Message) AddAttachmentWithContentType(filePath string, contentType string) string {
+func (msg *Message) AddAttachmentWithContentType(filePath string, contentType string) (string, error) {
 	fileName := filepath.Base(filePath)
-	id := getRandomString(52)
+	if fileName == "." || fileName == "/" {
+		return "", fmt.Errorf("invalid file path: %s", filePath)
+	}
+
+	id, err := (*msg).getRandomString(52)
+	if err != nil {
+		return "", err
+	}
+
 	(*msg).attachments = append((*msg).attachments, attachment{filePath: filePath, fileName: fileName, contentType: contentType, contentID: id})
-	return id
+	return id, nil
+}
+
+func (msg *Message) SetDeterministicIDs(prefix string) {
+	(*msg).idPrefix = prefix
+	(*msg).idCounter = 0
 }
 
 func (msg *Message) CheckMessage() error {
