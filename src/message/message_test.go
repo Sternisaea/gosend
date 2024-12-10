@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net"
 	"net/mail"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -77,45 +81,22 @@ func Test_Message(t *testing.T) {
 	}
 	defer mockSmtp.Shutdown()
 
+	imgFilePath, err := createImageFile()
+	if err != nil {
+		t.Fatalf("Error creating image file: %s", err)
+	}
+	defer os.Remove(imgFilePath)
+	imgFileName := filepath.Base(imgFilePath)
+
 	checklist := make([]check, 0, 100)
-	addCheck(t, &checklist, "From and no To",
-		mail.Address{Name: "Me", Address: "me@domain.local"},
-		[]mail.Address{},
-		[]mail.Address{},
-		[]mail.Address{},
-		[]mail.Address{},
-		"",
-		"Subject From",
-		"Plain text.",
-		"",
-		[]string{},
-		[]attach{},
-		&[]error{ErrNoRecipients},
-		&smtpservermock.Message{},
-	)
-	addCheck(t, &checklist, "To and no From",
-		mail.Address{},
-		[]mail.Address{{Name: "You", Address: "you@domain.local"}},
-		[]mail.Address{},
-		[]mail.Address{},
-		[]mail.Address{},
-		"",
-		"Subject To",
-		"Plain text.",
-		"",
-		[]string{},
-		[]attach{},
-		&[]error{ErrNoSender},
-		&smtpservermock.Message{},
-	)
-	addCheck(t, &checklist, "Multiple To addresses",
+	addCheck(t, &checklist, "To",
 		mail.Address{Name: "Me", Address: "me@domain.local"},
 		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
 		[]mail.Address{},
 		[]mail.Address{},
 		[]mail.Address{},
 		"",
-		"Subject Multiple To",
+		"Subject To",
 		"Plain text.",
 		"",
 		[]string{},
@@ -126,8 +107,150 @@ func Test_Message(t *testing.T) {
 			To:   []string{"you1@domain.local", "you2@domain.local"},
 			Data: "From: \"Me\" <me@domain.local>\r\n" +
 				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
-				"Subject: Subject Multiple To\r\n" +
+				"Subject: Subject To\r\n" +
 				"MIME-Version: 1.0\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n",
+		},
+	)
+	addCheck(t, &checklist, "CC",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
+		[]mail.Address{{Name: "Too 1", Address: "too1@domain.local"}, {Name: "Too 2", Address: "too2@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject CC",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you1@domain.local", "you2@domain.local", "too1@domain.local", "too2@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
+				"Cc: \"Too 1\" <too1@domain.local>,\"Too 2\" <too2@domain.local>\r\n" +
+				"Subject: Subject CC\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n",
+		},
+	)
+	addCheck(t, &checklist, "BCC",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
+		[]mail.Address{{Name: "Too 1", Address: "too1@domain.local"}, {Name: "Too 2", Address: "too2@domain.local"}},
+		[]mail.Address{{Name: "Secretly 1", Address: "secretly1@domain.local"}, {Name: "Secretly 2", Address: "secretly2@domain.local"}},
+		[]mail.Address{},
+		"",
+		"Subject BCC",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you1@domain.local", "you2@domain.local", "too1@domain.local", "too2@domain.local", "secretly1@domain.local", "secretly2@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
+				"Cc: \"Too 1\" <too1@domain.local>,\"Too 2\" <too2@domain.local>\r\n" +
+				"Subject: Subject BCC\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n",
+		},
+	)
+	addCheck(t, &checklist, "Reply To",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
+		[]mail.Address{{Name: "Too 1", Address: "too1@domain.local"}, {Name: "Too 2", Address: "too2@domain.local"}},
+		[]mail.Address{{Name: "Secretly 1", Address: "secretly1@domain.local"}, {Name: "Secretly 2", Address: "secretly2@domain.local"}},
+		[]mail.Address{{Name: "Answer 1", Address: "answer1@domain.local"}, {Name: "Answer 2", Address: "answer2@domain.local"}},
+		"",
+		"Subject Reply To",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you1@domain.local", "you2@domain.local", "too1@domain.local", "too2@domain.local", "secretly1@domain.local", "secretly2@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
+				"Cc: \"Too 1\" <too1@domain.local>,\"Too 2\" <too2@domain.local>\r\n" +
+				"Subject: Subject Reply To\r\n" +
+				"Reply-To: \"Answer 1\" <answer1@domain.local>,\"Answer 2\" <answer2@domain.local>\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n",
+		},
+	)
+	addCheck(t, &checklist, "Message ID",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"Identification123",
+		"Subject To",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you1@domain.local", "you2@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
+				"Subject: Subject To\r\n" +
+				"Message-ID: Identification123\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n",
+		},
+	)
+	addCheck(t, &checklist, "Headers",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You 1", Address: "you1@domain.local"}, {Name: "You 2", Address: "you2@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject To",
+		"Plain text.",
+		"",
+		[]string{"X-Privacy: Private", "X-Test: Not important"},
+		[]attach{},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you1@domain.local", "you2@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You 1\" <you1@domain.local>,\"You 2\" <you2@domain.local>\r\n" +
+				"Subject: Subject To\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"X-Privacy: Private\r\n" +
+				"X-Test: Not important\r\n" +
 				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
 				"Content-Transfer-Encoding: 7bit\r\n" +
 				"\r\n" +
@@ -209,22 +332,119 @@ func Test_Message(t *testing.T) {
 				"To: \"You\" <you@domain.local>\r\n" +
 				"Subject: Subject HMTL & Plain Text\r\n" +
 				"MIME-Version: 1.0\r\n" +
-				"Content-Type: multipart/alternative; boundary=\"UNIQUE_ID_00000000000000000001\"\r\n" +
+				"Content-Type: multipart/alternative; boundary=\"BOUNDARY_ID_00000001\"\r\n" +
 				"\r\n" +
-				"--UNIQUE_ID_00000000000000000001\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
 				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
 				"Content-Transfer-Encoding: 7bit\r\n" +
 				"\r\n" +
 				"Plain text.\r\n" +
 				"\r\n" +
-				"--UNIQUE_ID_00000000000000000001\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
 				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
 				"Content-Transfer-Encoding: 7bit\r\n" +
 				"\r\n" +
 				"<h1>Title</h1>\r\n<p>HTML text</p>\r\n" +
 				"\r\n" +
-				"--UNIQUE_ID_00000000000000000001--\r\n",
+				"--BOUNDARY_ID_00000001--\r\n",
 		},
+	)
+
+	// TO DO
+	addCheck(t, &checklist, "Attachments",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You", Address: "you@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject Attachments",
+		"Plain text.",
+		"<h1>Title</h1>\r\n<p>HTML text</p>",
+		[]string{},
+		[]attach{{filePath: imgFilePath}},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You\" <you@domain.local>\r\n" +
+				"Subject: Subject Attachments\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"Content-Type: multipart/mixed; boundary=\"BOUNDARY_ID_00000002\"\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: multipart/alternative; boundary=\"BOUNDARY_ID_00000001\"\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
+				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"<h1>Title</h1>\r\n<p>HTML text</p>\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001--\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: image/png; name=\"" + imgFileName + "\"\r\n" +
+				"Content-Transfer-Encoding: base64\r\n" +
+				"Content-Disposition: attachment; filename=\"" + imgFileName + "\"\r\n" +
+				"Content-ID: ATTACHMENT_ID_00000000000000000000000000000000000001\r\n" +
+				"\r\n" +
+				"iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAJElEQVR4nGJhYDjBxcBAHmIBEeSCUc2jmkc1j2qmXDMgAAD//7nxApWuSReTAAAAAElFTkSuQmCC\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002--\r\n",
+		},
+	)
+
+	addCheck(t, &checklist, "From without To",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject From",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		&[]error{ErrNoRecipients},
+		&smtpservermock.Message{},
+	)
+	addCheck(t, &checklist, "To without From",
+		mail.Address{},
+		[]mail.Address{{Name: "You", Address: "you@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject To",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		&[]error{ErrNoSender},
+		&smtpservermock.Message{},
+	)
+	addCheck(t, &checklist, "BCC without To",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{{Name: "Secretly 1", Address: "secretly1@domain.local"}, {Name: "Secretly 2", Address: "secretly2@domain.local"}},
+		[]mail.Address{},
+		"",
+		"Subject BCC",
+		"Plain text.",
+		"",
+		[]string{},
+		[]attach{},
+		&[]error{ErrNoRecipients},
+		&smtpservermock.Message{},
 	)
 
 	t.Run("SMTP Connection", func(t *testing.T) {
@@ -241,7 +461,7 @@ func Test_Message(t *testing.T) {
 		i := 0
 		for _, c := range checklist {
 			t.Run(c.name, func(t *testing.T) {
-				c.message.SetDeterministicIDs("UNIQUE_ID_")
+				c.message.SetDeterministicIDs("BOUNDARY_ID_")
 				err := c.message.SendContent(cl)
 				if cont, err := checkError(err, c.expectedErrors); !cont || err != nil {
 					if err != nil {
@@ -257,7 +477,7 @@ func Test_Message(t *testing.T) {
 				}
 
 				if !reflect.DeepEqual(*msg, *c.expectedMessage) {
-					t.Fatalf("Expected %v, got %v", c.expectedMessage, &msg)
+					t.Fatalf("Expected %v, got %v", c.expectedMessage, *msg)
 				}
 			})
 		}
@@ -280,6 +500,7 @@ func addCheck(t testing.TB, checklist *[]check, name string, from mail.Address, 
 	}
 	msg.SetBodyPlainText(plainText)
 	msg.SetBodyHtml(htmlText)
+	msg.SetDeterministicIDs("ATTACHMENT_ID_")
 	for _, a := range attachments {
 		if a.contentType == "" {
 			if _, err := msg.AddAttachment(a.filePath); err != nil {
@@ -349,4 +570,26 @@ func setDefaultResolver(dnsAddress string) {
 
 func getAddress(host string, port types.TCPPort) string {
 	return fmt.Sprintf("%s:%d", host, port)
+}
+
+func createImageFile() (string, error) {
+	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
+	for x := 0; x < 20; x++ {
+		for y := 0; y < 20; y++ {
+			img.Set(x, y, color.RGBA{uint8(x * 10), uint8(y * 10), 200, 255})
+		}
+	}
+
+	imgFile, err := os.CreateTemp(os.TempDir(), "image.png")
+	if err != nil {
+		return "", err
+	}
+	defer imgFile.Close()
+
+	err = png.Encode(imgFile, img)
+	if err != nil {
+		return "", err
+	}
+
+	return imgFile.Name(), nil
 }
