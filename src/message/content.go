@@ -212,7 +212,7 @@ func (msg *Message) getRandomString(length int) (string, error) {
 		if len((*msg).idPrefix)+len(c) > length {
 			return "", fmt.Errorf("prefix %s and counter %d do not fit length %d", (*msg).idPrefix, (*msg).idCounter, length)
 		}
-		return fmt.Sprintf("%s%0*d", (*msg).idPrefix, length, (*msg).idCounter), nil
+		return fmt.Sprintf("%s%0*d", (*msg).idPrefix, length-len((*msg).idPrefix), (*msg).idCounter), nil
 	}
 
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
