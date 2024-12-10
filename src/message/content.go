@@ -153,7 +153,7 @@ func (msg *Message) getAttachmentContent() ([]content, error) {
 		}
 
 		if a.contentType == "" {
-			contentType := http.DetectContentType(buffer[:512])
+			contentType := http.DetectContentType(buffer)
 			(*msg).attachments[i].contentType = contentType
 			a.contentType = contentType
 		}
