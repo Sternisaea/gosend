@@ -17,7 +17,6 @@ import (
 	"github.com/Sternisaea/gosend/src/certificates"
 	"github.com/Sternisaea/gosend/src/cmdflags"
 	"github.com/Sternisaea/gosend/src/types"
-	"github.com/Sternisaea/smtpservermock/src/smtpconst"
 	"github.com/Sternisaea/smtpservermock/src/smtpservermock"
 )
 
@@ -63,7 +62,7 @@ func Test_GetSecureConnection(t *testing.T) {
 	defer os.Remove(validCert)
 
 	mockSmtpNoSecurity, err := smtpservermock.NewSmtpServer(
-		smtpconst.NoSecurity,
+		smtpservermock.NoSecurity,
 		"Mock SMTP Server without security",
 		getAddress("localhost", smtpNoSecurityPort),
 		"",
@@ -77,7 +76,7 @@ func Test_GetSecureConnection(t *testing.T) {
 	defer mockSmtpNoSecurity.Shutdown()
 
 	mockSmtpStarttls, err := smtpservermock.NewSmtpServer(
-		smtpconst.StartTlsSec,
+		smtpservermock.StartTlsSec,
 		"Mock SMTP Server with STARTTLS",
 		getAddress("localhost", smtpStartTlsPort),
 		validCert,
@@ -91,7 +90,7 @@ func Test_GetSecureConnection(t *testing.T) {
 	defer mockSmtpStarttls.Shutdown()
 
 	mockSmtpTls, err := smtpservermock.NewSmtpServer(
-		smtpconst.SslTlsSec,
+		smtpservermock.SslTlsSec,
 		"Mock SMTP Server with TLS",
 		getAddress("localhost", smtpTlsPort),
 		validCert,
