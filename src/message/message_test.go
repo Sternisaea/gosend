@@ -81,12 +81,19 @@ func Test_Message(t *testing.T) {
 	}
 	defer mockSmtp.Shutdown()
 
-	imgFilePath, err := createImageFile()
+	imgFilePath1, err := createImageFile(0, 10)
 	if err != nil {
 		t.Fatalf("Error creating image file: %s", err)
 	}
-	defer os.Remove(imgFilePath)
-	imgFileName := filepath.Base(imgFilePath)
+	defer os.Remove(imgFilePath1)
+	imgFileName1 := filepath.Base(imgFilePath1)
+
+	imgFilePath2, err := createImageFile(50, 10)
+	if err != nil {
+		t.Fatalf("Error creating image file: %s", err)
+	}
+	defer os.Remove(imgFilePath2)
+	imgFileName2 := filepath.Base(imgFilePath2)
 
 	checklist := make([]check, 0, 100)
 	addCheck(t, &checklist, "To",
@@ -349,8 +356,6 @@ func Test_Message(t *testing.T) {
 				"--BOUNDARY_ID_00000001--\r\n",
 		},
 	)
-
-	// TO DO
 	addCheck(t, &checklist, "Attachments",
 		mail.Address{Name: "Me", Address: "me@domain.local"},
 		[]mail.Address{{Name: "You", Address: "you@domain.local"}},
@@ -362,7 +367,7 @@ func Test_Message(t *testing.T) {
 		"Plain text.",
 		"<h1>Title</h1>\r\n<p>HTML text</p>",
 		[]string{},
-		[]attach{{filePath: imgFilePath}},
+		[]attach{{filePath: imgFilePath1}, {filePath: imgFilePath2, contentType: "image/png"}},
 		nil,
 		&smtpservermock.Message{
 			From: "me@domain.local",
@@ -390,12 +395,81 @@ func Test_Message(t *testing.T) {
 				"\r\n" +
 				"--BOUNDARY_ID_00000001--\r\n" +
 				"--BOUNDARY_ID_00000002\r\n" +
-				"Content-Type: image/png; name=\"" + imgFileName + "\"\r\n" +
+				"Content-Type: image/png; name=\"" + imgFileName1 + "\"\r\n" +
 				"Content-Transfer-Encoding: base64\r\n" +
-				"Content-Disposition: attachment; filename=\"" + imgFileName + "\"\r\n" +
+				"Content-Disposition: attachment; filename=\"" + imgFileName1 + "\"\r\n" +
 				"Content-ID: ATTACHMENT_ID_00000000000000000000000000000000000001\r\n" +
 				"\r\n" +
 				"iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAJElEQVR4nGJhYDjBxcBAHmIBEeSCUc2jmkc1j2qmXDMgAAD//7nxApWuSReTAAAAAElFTkSuQmCC\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: image/png; name=\"" + imgFileName2 + "\"\r\n" +
+				"Content-Transfer-Encoding: base64\r\n" +
+				"Content-Disposition: attachment; filename=\"" + imgFileName2 + "\"\r\n" +
+				"Content-ID: ATTACHMENT_ID_00000000000000000000000000000000000002\r\n" +
+				"\r\n" +
+				"iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAJElEQVR4nGIxMjrBxcBAHmIBEeSCUc2jmkc1j2qmXDMgAAD//5YJAvns+K/iAAAAAElFTkSuQmCC\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002--\r\n",
+		},
+	)
+	addCheck(t, &checklist, "Attachments Embedded",
+		mail.Address{Name: "Me", Address: "me@domain.local"},
+		[]mail.Address{{Name: "You", Address: "you@domain.local"}},
+		[]mail.Address{},
+		[]mail.Address{},
+		[]mail.Address{},
+		"",
+		"Subject Attachments Embedded",
+		"Plain text.",
+		"<h1>Title</h1>\r\n<p>HTML text\r\n<img src=\""+imgFilePath1+"\" alt=\"Image1\">\r\n<img src=\""+imgFileName2+"\" alt=\"Image2\">\r\n</p>",
+		[]string{},
+		[]attach{{filePath: imgFilePath1}, {filePath: imgFilePath2, contentType: "image/png"}},
+		nil,
+		&smtpservermock.Message{
+			From: "me@domain.local",
+			To:   []string{"you@domain.local"},
+			Data: "From: \"Me\" <me@domain.local>\r\n" +
+				"To: \"You\" <you@domain.local>\r\n" +
+				"Subject: Subject Attachments Embedded\r\n" +
+				"MIME-Version: 1.0\r\n" +
+				"Content-Type: multipart/mixed; boundary=\"BOUNDARY_ID_00000002\"\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: multipart/alternative; boundary=\"BOUNDARY_ID_00000001\"\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
+				"contentType: Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"Plain text.\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001\r\n" +
+				"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+				"Content-Transfer-Encoding: 7bit\r\n" +
+				"\r\n" +
+				"<h1>Title</h1>\r\n" +
+				"<p>HTML text\r\n" +
+				"<img src=\"cid:ATTACHMENT_ID_00000000000000000000000000000000000001\" alt=\"Image1\">\r\n" +
+				"<img src=\"cid:ATTACHMENT_ID_00000000000000000000000000000000000002\" alt=\"Image2\">\r\n" +
+				"</p>\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000001--\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: image/png; name=\"" + imgFileName1 + "\"\r\n" +
+				"Content-Transfer-Encoding: base64\r\n" +
+				"Content-Disposition: attachment; filename=\"" + imgFileName1 + "\"\r\n" +
+				"Content-ID: ATTACHMENT_ID_00000000000000000000000000000000000001\r\n" +
+				"\r\n" +
+				"iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAJElEQVR4nGJhYDjBxcBAHmIBEeSCUc2jmkc1j2qmXDMgAAD//7nxApWuSReTAAAAAElFTkSuQmCC\r\n" +
+				"\r\n" +
+				"--BOUNDARY_ID_00000002\r\n" +
+				"Content-Type: image/png; name=\"" + imgFileName2 + "\"\r\n" +
+				"Content-Transfer-Encoding: base64\r\n" +
+				"Content-Disposition: attachment; filename=\"" + imgFileName2 + "\"\r\n" +
+				"Content-ID: ATTACHMENT_ID_00000000000000000000000000000000000002\r\n" +
+				"\r\n" +
+				"iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAJElEQVR4nGIxMjrBxcBAHmIBEeSCUc2jmkc1j2qmXDMgAAD//5YJAvns+K/iAAAAAElFTkSuQmCC\r\n" +
 				"\r\n" +
 				"--BOUNDARY_ID_00000002--\r\n",
 		},
@@ -572,11 +646,11 @@ func getAddress(host string, port types.TCPPort) string {
 	return fmt.Sprintf("%s:%d", host, port)
 }
 
-func createImageFile() (string, error) {
+func createImageFile(offset, multiplier int) (string, error) {
 	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	for x := 0; x < 20; x++ {
 		for y := 0; y < 20; y++ {
-			img.Set(x, y, color.RGBA{uint8(x * 10), uint8(y * 10), 200, 255})
+			img.Set(x, y, color.RGBA{uint8((x * multiplier) + offset), uint8((y * multiplier) + offset), 200, 255})
 		}
 	}
 
