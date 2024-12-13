@@ -1,4 +1,8 @@
-golang.org/x/net v0.30.0 h1:AcW1SDZMkb8IpzCdQUaIq2sP4sZ4zw+55h6ynffypl4=
-golang.org/x/net v0.30.0/go.mod h1:2wGyMJ5iFasEhkwi13ChkO/t1ECNC4X4eBKkVFyYFlU=
-golang.org/x/text v0.19.0 h1:kTxAhCbGbxhK0IwgSKiMO5awPoDQ0RpfiVYBfK860YM=
-golang.org/x/text v0.19.0/go.mod h1:BuEKDfySbSR4drPmRPG/7iBdf8hvFMuRexcpahXilzY=
+github.com/Sternisaea/dnsservermock v0.0.0-20241129120909-15f8c6bc4206 h1:LntZd1DQ5u95H2CSiRWEokgPHEMGGWXpIwZPJN27ss0=
+github.com/Sternisaea/dnsservermock v0.0.0-20241129120909-15f8c6bc4206/go.mod h1:G7A2LpZRRujuXfHgIVsVRxfEpuwiSZGX68JAcUKAb44=
+github.com/Sternisaea/smtpservermock v0.0.0-20241210115920-b48c8dc54b88 h1:Md1KDs6mWWnvE1gevLoat/aW6pWkXIh6B399E1PEjJc=
+github.com/Sternisaea/smtpservermock v0.0.0-20241210115920-b48c8dc54b88/go.mod h1:w8eSqJCQIW3hWbf3FRY9tkcRdac4dWteZaC/8+fKo1Y=
+golang.org/x/net v0.32.0 h1:ZqPmj8Kzc+Y6e0+skZsuACbx+wzMgo5MQsJh9Qd6aYI=
+golang.org/x/net v0.32.0/go.mod h1:CwU0IoeOlnQQWJ6ioyFrfRuomB8GKF6KbYXZVyeXNfs=
+golang.org/x/text v0.21.0 h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=
+golang.org/x/text v0.21.0/go.mod h1:4IBbMaMmOPCJ8SecivzSH54+73PCFmPWxNTLm+vZkEQ=

@@ -5,23 +5,63 @@ import (
 	"fmt"
 	"net/mail"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/net/idna"
 )
 
+var (
+	MaxLineLength = 78
+	maxPort       = int(^uint16(0))
+)
+
+var (
+	ErrFileEmpty    = errors.New("no file name provided")
+	ErrFileNotExist = errors.New("file does not exist")
+	ErrFile         = errors.New("file error")
+
+	ErrDomainEmpty   = errors.New("no domain name provided")
+	ErrDomainInvalid = errors.New("invalid domain name")
+
+	ErrPortInvalid    = errors.New("invalid TCP port")
+	ErrPortNegative   = errors.New("port number cannot be negative")
+	ErrPortOutOfRange = fmt.Errorf("port number out of range (maximum port no. is %d)", maxPort)
+
+	ErrSecurityInvalid       = errors.New("invalid security protocol")
+	ErrAuthenticationInvalid = errors.New("invalid authentication method")
+
+	ErrEmailInvalid = errors.New("invalid email address")
+
+	ErrAttachmentInvalid = errors.New("invalid attachment")
+
+	ErrHeaderEmpty            = errors.New("header is empty")
+	ErrHeaderNoColon          = errors.New("header must contain a colon")
+	ErrHeaderMultipleColons   = errors.New("header has multiple colons")
+	ErrHeaderNameEmpty        = errors.New("header name is empty")
+	ErrHeaderNameIllegalChars = errors.New("header name contains illegal characters")
+	ErrHeaderBodyEmpty        = errors.New("header body is empty")
+	ErrHeaderBodyIllegalChars = errors.New("header body contains illegal characters")
+	ErrHeaderLineTooLong      = fmt.Errorf("header line exceeds maximum lenght of %d", MaxLineLength)
+)
+
+var (
+	printableAscii         = regexp.MustCompile(`^[\x21-\x7E]+$`)
+	printableAsciiSpaceTab = regexp.MustCompile(`^[\x09\x20-\x7E]+$`)
+)
+
 type FilePath string
 
 func (fp *FilePath) Set(path string) error {
 	if path == "" {
-		return nil
+		return ErrFileEmpty
 	}
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("file %s does not exist (%s)", path, err)
+			return fmt.Errorf("%w: %w", ErrFileNotExist, err)
 		}
-		return fmt.Errorf("error file %s (%s)", path, err)
+		return fmt.Errorf("%w: %w", ErrFile, err)
 	}
 	*fp = FilePath(path)
 	return nil
@@ -34,9 +74,12 @@ func (fp FilePath) String() string {
 type DomainName string
 
 func (dn *DomainName) Set(host string) error {
+	if host == "" {
+		return fmt.Errorf("%w", ErrDomainEmpty)
+	}
 	d, err := idna.Lookup.ToASCII(host)
 	if err != nil {
-		return fmt.Errorf("invalid domain name: %s (%s)", host, err)
+		return fmt.Errorf("%w: %w", ErrDomainInvalid, err)
 	}
 	*dn = DomainName(d)
 	return nil
@@ -46,17 +89,18 @@ func (dn DomainName) String() string {
 	return string(dn)
 }
 
-var maxPort = int(^uint16(0))
-
 type TCPPort int
 
 func (tp *TCPPort) Set(portText string) error {
 	p, err := strconv.Atoi(portText)
 	if err != nil {
-		return fmt.Errorf("invalid SMTP TCP port %s (%s)", portText, err)
+		return fmt.Errorf("%w: %w", ErrPortInvalid, err)
+	}
+	if p < 0 {
+		return fmt.Errorf("%w", ErrPortNegative)
 	}
 	if p > maxPort {
-		return fmt.Errorf("port number %d out of range (maximum port no. is %d)", p, maxPort)
+		return fmt.Errorf("%w", ErrPortOutOfRange)
 	}
 	*tp = TCPPort(p)
 	return nil
@@ -64,28 +108,6 @@ func (tp *TCPPort) Set(portText string) error {
 
 func (tp TCPPort) String() string {
 	return strconv.Itoa(int(tp))
-}
-
-type AuthenticationMethod string
-
-const (
-	NoAuthentication AuthenticationMethod = ""
-	PlainAuth        AuthenticationMethod = "plain"
-	CramMd5Auth      AuthenticationMethod = "cram-md5"
-)
-
-func (a *AuthenticationMethod) Set(auth string) error {
-	switch authentication := strings.ToLower(auth); authentication {
-	case NoAuthentication.String(), PlainAuth.String(), CramMd5Auth.String():
-		*a = AuthenticationMethod(authentication)
-		return nil
-	default:
-		return fmt.Errorf("invalid authentication method: %s (valid options are: %s, %s)", auth, PlainAuth, CramMd5Auth)
-	}
-}
-
-func (a AuthenticationMethod) String() string {
-	return string(a)
 }
 
 type Security string
@@ -102,7 +124,7 @@ func (s *Security) Set(sec string) error {
 		*s = Security(security)
 		return nil
 	default:
-		return fmt.Errorf("invalid security protocol: %s (valid options are: %s, %s)", sec, StartTlsSec, SslTlsSec)
+		return fmt.Errorf("%w", ErrSecurityInvalid)
 	}
 }
 
@@ -110,11 +132,33 @@ func (s Security) String() string {
 	return string(s)
 }
 
+type AuthenticationMethod string
+
+const (
+	NoAuthentication AuthenticationMethod = ""
+	PlainAuth        AuthenticationMethod = "plain"
+	CramMd5Auth      AuthenticationMethod = "cram-md5"
+)
+
+func (a *AuthenticationMethod) Set(auth string) error {
+	switch authentication := strings.ToLower(auth); authentication {
+	case NoAuthentication.String(), PlainAuth.String(), CramMd5Auth.String():
+		*a = AuthenticationMethod(authentication)
+		return nil
+	default:
+		return fmt.Errorf("%w", ErrAuthenticationInvalid)
+	}
+}
+
+func (a AuthenticationMethod) String() string {
+	return string(a)
+}
+
 type Email mail.Address
 
 func (e *Email) Set(email string) error {
 	if ea, err := mail.ParseAddress(strings.Trim(email, " ")); err != nil {
-		return fmt.Errorf("invalid email address: %s (%s)", email, err)
+		return fmt.Errorf("%w: %w", ErrEmailInvalid, err)
 	} else {
 		*e = Email(*ea)
 	}
@@ -133,7 +177,7 @@ func (e Email) GetMailAddress() mail.Address {
 type EmailAddresses []Email
 
 func (eas *EmailAddresses) Set(emails string) error {
-	for _, e := range strings.Split(emails, ",") {
+	for _, e := range strings.SplitN(emails, ",", -1) {
 		em := strings.TrimSpace(e)
 		if em != "" {
 			var email Email
@@ -163,30 +207,95 @@ func (eas EmailAddresses) GetMailAddresses() []mail.Address {
 	return emails
 }
 
-type Headers []string
+type Header string
+
+func (h *Header) Set(text string) error {
+	if err := CheckHeader(text); err != nil {
+		return err
+	}
+	*h = Header(text)
+	return nil
+}
+
+func (h *Header) String() string {
+	return string(*h)
+}
+
+func CheckHeader(text string) error {
+	// RFC5322
+	if text == "" {
+		return ErrHeaderEmpty
+	}
+	parts := strings.SplitN(text, ":", -1)
+	if len(parts) == 1 {
+		return ErrHeaderNoColon
+	}
+	if len(parts) > 2 {
+		return ErrHeaderMultipleColons
+	}
+
+	lines := strings.SplitN(text, "\r\n", -1)
+	for i, line := range lines {
+		if len(line) > MaxLineLength {
+			return ErrHeaderLineTooLong
+		}
+
+		var body string
+		if i == 0 {
+			parts := strings.SplitN(line, ":", -1)
+			name := strings.TrimSpace(parts[0])
+			body = strings.TrimSpace(parts[1])
+
+			if name == "" {
+				return ErrHeaderNameEmpty
+			}
+			if !printableAscii.MatchString(name) {
+				return ErrHeaderNameIllegalChars
+			}
+		} else {
+			body = line
+		}
+
+		if body == "" {
+			return ErrHeaderBodyEmpty
+		}
+		if !printableAsciiSpaceTab.MatchString(body) {
+			return ErrHeaderBodyIllegalChars
+		}
+
+	}
+	return nil
+}
+
+type Headers []Header
 
 func (hs *Headers) Set(text string) error {
-	h := text
+	var h Header
+	if err := h.Set(text); err != nil {
+		return err
+	}
 	(*hs) = append((*hs), h)
 	return nil
 }
 
 func (hs Headers) String() string {
-	return strings.Join(hs, ", ")
+	headers := make([]string, 0, len(hs))
+	for _, h := range hs {
+		headers = append(headers, h.String())
+	}
+	return strings.Join(headers, ", ")
 }
 
 type Attachments []FilePath
 
 func (at *Attachments) Set(attachments string) error {
-	for _, a := range strings.Split(attachments, ",") {
+	for _, a := range strings.SplitN(attachments, ",", -1) {
 		attach := strings.TrimSpace(a)
-		if attach != "" {
-			var fp FilePath
-			if err := fp.Set(attach); err != nil {
-				return fmt.Errorf("invalid attachment: %s (%s)", attach, err)
-			}
-			*at = append(*at, fp)
+		var fp FilePath
+		if err := fp.Set(attach); err != nil {
+			return fmt.Errorf("%w: %w", ErrAttachmentInvalid, err)
 		}
+		*at = append(*at, fp)
 	}
 	return nil
 }
