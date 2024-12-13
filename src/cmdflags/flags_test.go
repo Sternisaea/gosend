@@ -158,7 +158,8 @@ func Test_GetSettings(t *testing.T) {
 	addCheckErr(t, &checklist, "flag "+flagAttachment+" empty", []option{{flagAttachment, ""}}, &[]error{types.ErrAttachmentInvalid, types.ErrFileEmpty})
 	addCheckErr(t, &checklist, "flag "+flagAttachment+" fake", []option{{flagAttachment, tmpNonExistingFileName}}, &[]error{types.ErrAttachmentInvalid, types.ErrFileNotExist})
 
-	addCheckOk(t, &checklist, "flag "+flagHelp+" help", []option{{flagHelp, ""}}, &Settings{Help: true})
+	addCheckOk(t, &checklist, "flag "+flagHelp+" help", []option{{flagHelp, ""}}, nil)
+	addCheckOk(t, &checklist, "flag "+flagVersion+" help", []option{{flagVersion, ""}}, nil)
 
 	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" normal", flagServerFile, []option{{flagSmtpHost, "domain.com"}}, []option{}, &Settings{SmtpHost: "domain.com"})
 	addSettingsCheckOk(t, &checklist, "setting "+flagSmtpHost+" non-tld", flagServerFile, []option{{flagSmtpHost, "domain"}}, []option{}, &Settings{SmtpHost: "domain"})
@@ -209,17 +210,17 @@ func Test_GetSettings(t *testing.T) {
 	addSettingsCheckErr(t, &checklist, "setting "+flagSender+" no domain", flagServerFile, []option{{flagSender, "sender@"}}, []option{}, &[]error{types.ErrEmailInvalid})
 	addSettingsCheckOk(t, &checklist, "setting "+flagSender+" overrule", flagServerFile, []option{{flagSender, "Sender<sender@example.com>"}}, []option{{flagSender, "sender@example.com"}}, &Settings{Sender: types.Email{Name: "", Address: "sender@example.com"}})
 
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagReplyTo, flagServerFile, []option{{flagReplyTo, "replyto@example.com"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagTo, flagServerFile, []option{{flagTo, "To1<to1@example.com>,To2<to2@example.com>"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagCc, flagServerFile, []option{{flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBcc, flagServerFile, []option{{flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagMessageId, flagServerFile, []option{{flagMessageId, "ID-1234567890"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagSubject, flagServerFile, []option{{flagSubject, "Subject"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagHeader, flagServerFile, []option{{flagHeader, "X-Test: testing"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBodyText, flagServerFile, []option{{flagBodyText, "This is a plain text \nbody."}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagBodyHtml, flagServerFile, []option{{flagBodyHtml, "<p>This is an HTML body.</p>"}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagAttachment, flagServerFile, []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName2)}}, []option{}, &Settings{})
-	addSettingsCheckOk(t, &checklist, "not allowed setting "+flagHelp, flagServerFile, []option{{flagHelp, ""}}, []option{}, &Settings{})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagReplyTo, flagServerFile, []option{{flagReplyTo, "replyto@example.com"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagTo, flagServerFile, []option{{flagTo, "To1<to1@example.com>,To2<to2@example.com>"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagCc, flagServerFile, []option{{flagCc, "Cc1<cc1@example.com>,Cc2<cc2@example.com>"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagBcc, flagServerFile, []option{{flagBcc, "Bcc1<bcc1@example.com>,Bcc2<bcc2@example.com>"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagMessageId, flagServerFile, []option{{flagMessageId, "ID-1234567890"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagSubject, flagServerFile, []option{{flagSubject, "Subject"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagHeader, flagServerFile, []option{{flagHeader, "X-Test: testing"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagBodyText, flagServerFile, []option{{flagBodyText, "This is a plain text \nbody."}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagBodyHtml, flagServerFile, []option{{flagBodyHtml, "<p>This is an HTML body.</p>"}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagAttachment, flagServerFile, []option{{flagAttachment, fmt.Sprintf("%s, %s", tmpExistingFileName, tmpExistingFileName2)}}, []option{}, &[]error{ErrIllegalFlagOption})
+	addSettingsCheckErr(t, &checklist, "not allowed setting "+flagHelp, flagServerFile, []option{{flagHelp, ""}}, []option{}, &[]error{ErrIllegalFlagOption})
 
 	for _, opt := range checklist {
 		t.Run(opt.name, func(t *testing.T) {

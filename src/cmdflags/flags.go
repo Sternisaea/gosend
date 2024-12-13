@@ -2,6 +2,7 @@ package cmdflags
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,7 +34,22 @@ const (
 	flagBodyHtml   = "body-html"
 	flagAttachment = "attachment"
 	flagHelp       = "help"
+	flagVersion    = "version"
 )
+
+var allowedInFile = []string{
+	flagSmtpHost,
+	flagSmtpPort,
+	flagRootCA,
+	flagSecurity,
+	flagAuthMethod,
+	flagLogin,
+	flagPassword,
+	flagSender,
+}
+
+var version = "development"
+var ErrIllegalFlagOption = errors.New("illegal flag option in settings file")
 
 type Settings struct {
 	SmtpHost       types.DomainName
@@ -56,8 +72,6 @@ type Settings struct {
 	BodyText    string
 	BodyHtml    string
 	Attachments types.Attachments
-
-	Help bool
 }
 
 func GetSettings(output io.Writer) (*Settings, error) {
@@ -66,8 +80,8 @@ func GetSettings(output io.Writer) (*Settings, error) {
 		return nil, err
 	}
 
-	if (*settings).Help {
-		return settings, nil
+	if settings == nil {
+		return nil, nil
 	}
 
 	opts := make(map[string]string)
@@ -133,7 +147,8 @@ func GetSettings(output io.Writer) (*Settings, error) {
 
 func getFlagSettings(output io.Writer) (*Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
-	var settings Settings
+	var settings = Settings{}
+	var helpSet, versionSet bool
 
 	fs := flag.NewFlagSet("cmdflags", flag.ContinueOnError)
 	fs.Usage = func() {}     // Disable flags usage output
@@ -162,18 +177,26 @@ func getFlagSettings(output io.Writer) (*Settings, types.FilePath, types.FilePat
 	fs.StringVar(&settings.BodyText, flagBodyText, "", "Body content in plain text.Add new lines as \\n.")
 	fs.StringVar(&settings.BodyHtml, flagBodyHtml, "", "Body content in HTML.")
 	fs.Var(&settings.Attachments, flagAttachment, fmt.Sprintf("File path to attachment. Comma separate multiple attachments of use multiple %s options.", flagAttachment))
-	fs.BoolVar(&settings.Help, flagHelp, false, "Show flag options.")
+
+	fs.BoolVar(&helpSet, flagHelp, false, "Show flag options.")
+	fs.BoolVar(&versionSet, flagVersion, false, "Show version.")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
-		return &Settings{}, "", "", err
+		return nil, "", "", err
 	}
 
-	if settings.Help {
+	if helpSet {
 		fs.SetOutput(output) // Enable text output
 		fs.PrintDefaults()   // Print flags usage
-		return &settings, "", "", nil
+		return nil, "", "", nil
 	}
+	if versionSet {
+		fs.SetOutput(output)
+		fmt.Fprintf(output, "gosend version %s\n", version)
+		return nil, "", "", nil
+	}
+
 	return &settings, serverFilePath, authFilePath, nil
 }
 
@@ -197,10 +220,22 @@ func appendOptionsOfFile(opts map[string]string, filePath types.FilePath) (map[s
 		}
 		key := strings.ToLower(strings.TrimSpace(line[:equalIndex]))
 		value := strings.Trim(strings.TrimSpace(line[equalIndex+1:]), "\"")
+		if !contains(allowedInFile, key) {
+			return nil, fmt.Errorf("%w: %s in %s)", ErrIllegalFlagOption, key, filePath)
+		}
 		opts[key] = value
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading file: %s", err)
 	}
 	return opts, nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, str := range slice {
+		if str == item {
+			return true
+		}
+	}
+	return false
 }
