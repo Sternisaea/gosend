@@ -11,8 +11,10 @@ import (
 	"github.com/Sternisaea/gosend/src/send"
 )
 
+var version = "development"
+
 func main() {
-	st, err := cmdflags.GetSettings(os.Stdout)
+	st, err := cmdflags.GetSettings(os.Stdout, version)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(2)

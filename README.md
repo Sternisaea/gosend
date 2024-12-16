@@ -1,13 +1,10 @@
-*19 october 2024*
-
-**WORK IN PROGRESS**
-
 # gosend
-**gosend** is a command line SMTP client written in Go to send e-mails over STARTTLS or SSL/TLS. It supports plain text, HTML and attachments.
+**gosend** is a command line SMTP client written in Go to send e-mails over STARTTLS or SSL/TLS. It supports plain text, HTML and attachments. It is available for Linux, MacOS, Windows, FreeBSD, OpenBSD, NetBSD for the architectures i386, amd64 and arm64.
 
 ## Flag Options
 
 - `-help`: Show flag options.
+- `-version`: Show version.
 
 ### Server
 
@@ -44,9 +41,11 @@
 ### Notes
 
 - Authentication method `plain` requires a secure connection (except for `localhost`).
-- New lines in the `body-text` and `body-html` are supported by inserting `\n`in your text. These wil be converted to CR LF in your e-mail message.
+- New lines in the `body-text` and `body-html` are supported by inserting `\n` in your text. These wil be converted to CR LF in your e-mail message.
+- Double quotes need to be escaped by using a backslash. e.g. `\"`.
 - To send your e-mail to multiple recipients you can either use multiple `-to`options or a `-to`option with comma separated addresses.
 - To send multiple attachments you can either use multiple `-attachment`options or a `-attachment`option with comma separated files.
+- Attachments can be embedded in HTML by referring to the attachment using its file name. This may include the path to the file as defined in `-attachment`. The file name with optional path is expected to be enclosed between double quotes.
 - `-rootca`can be used when your mail server is using a self-signed certificate.
   - The X.509 certificate must be a PEM container file.
   - Use *Subject Alternative Name* (SAN) fields in your self-signed certificate.

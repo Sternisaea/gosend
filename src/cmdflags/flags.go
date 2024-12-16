@@ -48,7 +48,6 @@ var allowedInFile = []string{
 	flagSender,
 }
 
-var version = "development"
 var ErrIllegalFlagOption = errors.New("illegal flag option in settings file")
 
 type Settings struct {
@@ -74,8 +73,8 @@ type Settings struct {
 	Attachments types.Attachments
 }
 
-func GetSettings(output io.Writer) (*Settings, error) {
-	settings, serverFilePath, authFilePath, err := getFlagSettings(output)
+func GetSettings(output io.Writer, version string) (*Settings, error) {
+	settings, serverFilePath, authFilePath, err := getFlagSettings(output, version)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +144,7 @@ func GetSettings(output io.Writer) (*Settings, error) {
 	return settings, nil
 }
 
-func getFlagSettings(output io.Writer) (*Settings, types.FilePath, types.FilePath, error) {
+func getFlagSettings(output io.Writer, version string) (*Settings, types.FilePath, types.FilePath, error) {
 	var serverFilePath, authFilePath types.FilePath
 	var settings = Settings{}
 	var helpSet, versionSet bool
@@ -193,7 +192,7 @@ func getFlagSettings(output io.Writer) (*Settings, types.FilePath, types.FilePat
 	}
 	if versionSet {
 		fs.SetOutput(output)
-		fmt.Fprintf(output, "gosend version %s\n", version)
+		fmt.Fprintf(output, "gosend %s\n", version)
 		return nil, "", "", nil
 	}
 

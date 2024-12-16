@@ -229,7 +229,7 @@ func Test_GetSettings(t *testing.T) {
 			}
 
 			os.Args = opt.arguments
-			settings, err := GetSettings(io.Discard)
+			settings, err := GetSettings(io.Discard, "test")
 
 			if opt.expectedErrors == nil || len(*opt.expectedErrors) == 0 {
 				if err != nil {
